@@ -11,6 +11,7 @@ Some useful link to RAiDER
 
 Some useful link to getting GOES data on Google Earth Engine (GEE)  
 [Beginner's Guide to GOES-R Series Data](https://www.goes-r.gov/downloads/resources/documents/Beginners_Guide_to_GOES-R_Series_Data.pdf)  
-[Quick Overview of GOES in Google Earth Engine](https://jstnbraaten.medium.com/goes-in-earth-engine-53fbc8783c16)  
+[Quick Overview of GOES in Google Earth Engine](https://jstnbraaten.medium.com/goes-in-earth-engine-53fbc8783c16)    
+[End-to-End Google Earth Engine (Full Course Material)](https://courses.spatialthoughts.com/end-to-end-gee.html#)  
 
 
