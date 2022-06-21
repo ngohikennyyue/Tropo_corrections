@@ -168,7 +168,7 @@ def PTE_interp(wm, loc, df):
 # df : The list of combined data from downloading GNSS data using RAiDER Package
 # Vertical: would like to interpolate everything from vertically from the lat lon
 
-def extract_param_GNSS_update(df, wm_file_path: str, workLoc: str, vertical=False, fixed_hgt=False):
+def extract_param_GNSS_update(df, wm_file_path: str, workLoc: str = '', vertical=False, fixed_hgt=False):
     Date = np.sort(list(set(df['Date'])))
     for num, i in enumerate(Date):
         print(i)
