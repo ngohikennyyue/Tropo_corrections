@@ -149,44 +149,47 @@ def extract_data(ds1, dem, Raster, left, bottom, right, top):
     return p1, t1, e1, dem.reshape(len(dem), 1), w
 
 
+def PTE_interp(wm, loc, df):
+    # Create interpretor for each param
+    P_interp = make_interpretor(wm, 'p')
+    T_interp = make_interpretor(wm, 't')
+    e_interp = make_interpretor(wm, 'e')
+
+    # Interp the param
+    df['P'] = (P_interp(loc))
+    df['T'] = (T_interp(loc))
+    df['e'] = (e_interp(loc))
+
+    return df
+
+
 # Function which is able to retrieve obtain the weather param for the GNSS and date
 # file path: have to be the file where all the weather model are saved
 # df : The list of combined data from downloading GNSS data using RAiDER Package
 # Vertical: would like to interpolate everything from vertically from the lat lon
 
-def extract_param_GNSS(df, file_path: str, vertical=False, fixed_hgt=False):
-    dataFrame = []
+def extract_param_GNSS_update(df, wm_file_path: str, workLoc: str, vertical=False, fixed_hgt=False):
     Date = np.sort(list(set(df['Date'])))
-    for i in Date:
+    for num, i in enumerate(Date):
         print(i)
         dd = df.loc[df['Date'] == i]
         date = i.replace('-', '_')  # Retrieve the date of the GNSS for NWM
 
-        path_name = glob.glob(file_path + 'ERA-5_{date}*[A-Z].nc'.format(date=date))
+        path_name = glob.glob(wm_file_path + 'ERA-5_{date}*[A-Z].nc'.format(date=date))
         print(path_name)
         try:
             ds = xr.load_dataset(" ".join(path_name))  # xr to read the weather model
-            # dd = dd[(dd['Lon'] >= ds.x.min())& (dd['Lon']<= ds.x.max())&(dd['Lat'] >= ds.y.min())& (dd['Lat']<=
-            # ds.y.max())]
+            # dd = dd[(dd['Lon'] >= ds.x.min())& (dd['Lon']<= ds.x.max())&(dd['Lat'] >= ds.y.min())& (dd['Lat']<= ds.y.max())]
             loc = dd[['Lon', 'Lat', 'Hgt_m']].values
         except:
             continue
         if not vertical:
-            # Create interpretor for each param
-            P_interp = make_interpretor(ds, 'p')
-            T_interp = make_interpretor(ds, 't')
-            e_interp = make_interpretor(ds, 'e')
-
-            # Interp the param
-            P = (P_interp(loc))
-            T = (T_interp(loc))
-            e = (e_interp(loc))
-
-            dd['P'] = P
-            dd['T'] = T
-            dd['e'] = e
-
-            dataFrame.append(dd)
+            # Create interpreter for each param
+            data = PTE_interp(ds, loc, dd)
+            if num == 0:
+                data.to_csv(workLoc + 'PTE_interp.csv', index=False)
+            else:
+                data.to_csv(workLoc + 'PTE_interp.csv', mode='a', index=False, header=False)
             print('Done', i)
 
         else:
@@ -200,8 +203,19 @@ def extract_param_GNSS(df, file_path: str, vertical=False, fixed_hgt=False):
                 P = pd.DataFrame(ds.p.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
                 T = pd.DataFrame(ds.t.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
                 e = pd.DataFrame(ds.e.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                dataFrame.append(pd.concat([dd.reset_index(drop=True), P, T, e], axis=1, ignore_index=True))
+                data = pd.concat([dd.reset_index(drop=True), P, T, e], axis=1, ignore_index=True)
+
+                if num == 0:
+                    name = ['P_' + str(i) for i in range(1, len(z) + 1)] + ['T_' + str(i) for i in
+                                                                            range(1, len(z) + 1)] + ['e_' + str(i) for i
+                                                                                                     in range(1,
+                                                                                                              len(z) + 1)]
+                    data.columns = np.concatenate((df.columns, name))
+                    data.to_csv(workLoc + 'PTE_vert_fixed_hgtlvs.csv', index=False)
+                else:
+                    data.to_csv(workLoc + 'PTE_vert_fixed_hgtlvs.csv', mode='a', index=False, header=False)
                 print('Done', i)
+
             else:
                 # Get coordinate of the GPS station
                 x = xr.DataArray(dd['Lon'].ravel(), dims='x')
@@ -212,14 +226,23 @@ def extract_param_GNSS(df, file_path: str, vertical=False, fixed_hgt=False):
                 P = pd.DataFrame(ds.p.interp(x=x, y=y).values.transpose().diagonal().transpose())
                 T = pd.DataFrame(ds.t.interp(x=x, y=y).values.transpose().diagonal().transpose())
                 e = pd.DataFrame(ds.e.interp(x=x, y=y).values.transpose().diagonal().transpose())
-                dataFrame.append(pd.concat([dd.reset_index(drop=True), P, T, e], axis=1, ignore_index=True))
-                print('Done', i)
+                data = pd.concat([dd.reset_index(drop=True), P, T, e], axis=1, ignore_index=True)
 
-    Data = pd.concat(dataFrame, ignore_index=True)
-    if Vertical == True:
-        name = ['P_' + str(i) for i in range(1, len(z) + 1)] + ['T_' + str(i) for i in range(1, len(z) + 1)] + [
-            'e_' + str(i) for i in range(1, len(z) + 1)]
-        Data.columns = np.concatenate((df.columns, name))
-        return Data
-    else:
-        return Data
+                if num == 0:
+                    name = ['P_' + str(i) for i in range(1, len(z) + 1)] + ['T_' + str(i) for i in
+                                                                            range(1, len(z) + 1)] + ['e_' + str(i) for i
+                                                                                                     in range(1,
+                                                                                                              len(z) + 1)]
+                    data.columns = np.concatenate((df.columns, name))
+                    data.to_csv(workLoc + 'PTE_vert.csv', index=False)
+                else:
+                    data.to_csv(workLoc + 'PTE_vert.csv', mode='a', index=False, header=False)
+                print('Done', i)
+    print('Finished extraction.')
+    # Data = pd.concat(dataFrame,ignore_index=True)
+    # if vertical == True:
+    #   name = ['P_'+str(i) for i in range(1,len(z)+1)] + ['T_'+str(i) for i in range(1,len(z)+1)] +['e_'+str(i) for i in range(1,len(z)+1)]
+    #   dataframe.columns = np.concatenate((df.columns,name))
+    #   return dataframe
+    # else:
+    #   return dataframe
