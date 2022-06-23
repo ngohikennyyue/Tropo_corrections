@@ -1,4 +1,5 @@
 import ee
+import os
 import pandas as pd
 import numpy as np
 import folium
@@ -61,7 +62,7 @@ def to_array(img, aoi):
         else:
             dat = np.array(band_arrs.get(band_names[kk]).getInfo())
             dat_full[:, :, kk] = dat
-    return (dat_full)
+    return dat_full
 
 
 # create an earth engine geometry polygon
@@ -92,7 +93,7 @@ def get_GOES16_image(datetime, geometry=None):
     import ee
     date1, date2 = datetime_margin(datetime)
     GOES = ee.ImageCollection('NOAA/GOES/16/MCMIPC')
-    if geometry == None:
+    if geometry is None:
         GOES_img = GOES.filterDate(date1, date2).first()
     else:
         GOES_img = GOES.filterDate(date1, date2).filterBounds(geometry).first().clip(geometry)
@@ -103,7 +104,7 @@ def get_GOES17_image(datetime, geometry=None):
     import ee
     date1, date2 = datetime_margin(datetime)
     GOES = ee.ImageCollection('NOAA/GOES/17/MCMIPC')
-    if geometry == None:
+    if geometry is None:
         GOES_img = GOES.filterDate(date1, date2).first()
     else:
         GOES_img = GOES.filterDate(date1, date2).filterBounds(geometry).first().clip(geometry)
@@ -153,12 +154,13 @@ def sampFeat2array(img, points_list, bands):
 def extract_param(file_path: str, time: str, bands: list):
     name = file_path.split('/')[-1].split('.')[0]
     ext = file_path.split('/')[-1].split('.')[-1]
+    print(name, ext)
     if ext == 'csv':
         df = pd.read_csv(file_path)
-        df = df[df['Date'] > '2017-07-10']
+        df = df[df['Date'] > '2017-07-10']  # GOES data only valid after 20170710
     elif ext == 'ftr':
         df = pd.read_feather(file_path)
-        df = df[df['Date'] > '2017-07-10']
+        df = df[df['Date'] > '2017-07-10']  # GOES data only valid after 20170710
     else:
         print('Can not read this file type', ext)
         exit()
@@ -166,10 +168,8 @@ def extract_param(file_path: str, time: str, bands: list):
     Date = np.sort(list(set(df['Date'])))
     for num, i in enumerate(Date):
         print('Extracting...', i)
-        dd = df.loc[df['Date'] == i]
+        dd = df.loc[df['Date'] == i].copy()
         station = dd[['Lon', 'Lat']].values
-        # area = addGeometry(station[:,0].min(),station[:,0].max(),station[:,1].min(),station[:,1].max())
-        # print(area)
         # get GOES 16 image
         img = get_GOES16_image(i + 'T' + time)
         if isinstance(img.getInfo(), (float, int, str, list, dict, tuple)):  # skip any empty dataset
@@ -183,11 +183,11 @@ def extract_param(file_path: str, time: str, bands: list):
             else:
                 print('Adding bands to the Dataframe...')
                 for b, band in enumerate(bands):
-                    dd[band] = ext[:, b]
+                    dd.loc[:, band] = ext[:, b]
                 if num == 0:
-                    dd.to_csv(str(name) + '_cloud.csv', index=False)
+                    dd.to_csv(os.getcwd() + '/' + name + '_cloud.csv', index=False)
                 else:
-                    dd.to_csv(str(name) + '_cloud.csv', index=False, header=False, mode='a')
+                    dd.to_csv(os.getcwd() + '/' + name + '_cloud.csv', index=False, header=False, mode='a')
                 print('Done')
         else:
             print('Empty data... Skipped')
