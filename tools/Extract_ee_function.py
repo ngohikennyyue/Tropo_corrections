@@ -152,6 +152,7 @@ def sampFeat2array(img, points_list, bands):
 # geometry: AOI can be created with addGeometry function
 # bands: bands that are of interested in a list []
 def extract_param(file_path: str, time: str, bands: list):
+    loc = os.path.dirname(os.path.abspath(file_path))
     name = file_path.split('/')[-1].split('.')[0]
     ext = file_path.split('/')[-1].split('.')[-1]
     print(name, ext)
@@ -185,9 +186,9 @@ def extract_param(file_path: str, time: str, bands: list):
                 for b, band in enumerate(bands):
                     dd.loc[:, band] = ext[:, b]
                 if num == 0:
-                    dd.to_csv(os.getcwd() + '/' + name + '_cloud.csv', index=False)
+                    dd.to_csv(loc + '/' + name + '_cloud.csv', index=False)
                 else:
-                    dd.to_csv(os.getcwd() + '/' + name + '_cloud.csv', index=False, header=False, mode='a')
+                    dd.to_csv(loc + '/' + name + '_cloud.csv', index=False, header=False, mode='a')
                 print('Done')
         else:
             print('Empty data... Skipped')
