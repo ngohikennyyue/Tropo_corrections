@@ -133,14 +133,17 @@ def sampFeat2array(img, points_list, bands):
     multi_point = list2features(points_list)
     ft = img.sampleRegions(multi_point)
     for kk in range(len(bands)):
-        if kk == 0:
-            dat1 = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(bands[kk])).getInfo()
-            print(len(dat1))
-            dat_full = np.zeros((len(dat1), len(bands)))
-            dat_full[:, kk] = dat1
-        else:
-            dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(bands[kk])).getInfo()
-            dat_full[:, kk] = dat
+        try:
+            if kk == 0:
+                dat1 = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(bands[kk])).getInfo()
+                print(len(dat1))
+                dat_full = np.zeros((len(dat1), len(bands)))
+                dat_full[:, kk] = dat1
+            else:
+                dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(bands[kk])).getInfo()
+                dat_full[:, kk] = dat
+        except ee.ee_exception.EEException:
+            continue
     # dat_full = pd.DataFrame(dat_full)
     # dat_full.columns = [bands]
     return dat_full
