@@ -12,18 +12,23 @@ import xarray as xr
 from scipy.interpolate import RegularGridInterpolator as rgi
 # from scipy.spatial.distance import pdist
 # from scipy.spatial.distance import cdist
-# import sklearn
+import sklearn
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
-from sklearn.decomposition import PCA
-from sklearn.model_selection import cross_val_score, cross_validate, train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.compose import TransformedTargetRegressor
-from sklearn.model_selection import KFold
+# from sklearn.decomposition import PCA
+# from sklearn.model_selection import cross_val_score, cross_validate, train_test_split
+# from sklearn.pipeline import Pipeline
+# from sklearn.compose import TransformedTargetRegressor
+# from sklearn.model_selection import KFold
 
 
 # import tensorflow as tf
 # from tensorflow.keras.callbacks import EarlyStopping
 # from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
+
+hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400
+    , 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000
+    , 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000, 11000, 12000, 13000
+    , 14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
 
 
 def plot_result(true, predict):
@@ -54,25 +59,25 @@ def standardized(x, scaler):
     return X, sc
 
 
-import mpl_scatter_density  # adds projection='scatter_density'
-from matplotlib.colors import LinearSegmentedColormap
-
-# "Viridis-like" colormap with white background
-white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
-    (0, '#ffffff'),
-    (1e-20, '#440053'),
-    (0.2, '#404388'),
-    (0.4, '#2a788e'),
-    (0.6, '#21a784'),
-    (0.8, '#78d151'),
-    (1, '#fde624'),
-], N=256)
-
-
-def using_mpl_scatter_density(fig, x, y):
-    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
-    density = ax.scatter_density(x, y, cmap=white_viridis)
-    fig.colorbar(density, label='Number of points per pixel')
+# import mpl_scatter_density  # adds projection='scatter_density'
+# from matplotlib.colors import LinearSegmentedColormap
+#
+# # "Viridis-like" colormap with white background
+# white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
+#     (0, '#ffffff'),
+#     (1e-20, '#440053'),
+#     (0.2, '#404388'),
+#     (0.4, '#2a788e'),
+#     (0.6, '#21a784'),
+#     (0.8, '#78d151'),
+#     (1, '#fde624'),
+# ], N=256)
+#
+#
+# def using_mpl_scatter_density(fig, x, y):
+#     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+#     density = ax.scatter_density(x, y, cmap=white_viridis)
+#     fig.colorbar(density, label='Number of points per pixel')
 
 
 # Extract value from raster and their lat/lon grid of the bounding area
@@ -168,7 +173,7 @@ def PTE_interp(wm, loc, df):
 # df : The list of combined data from downloading GNSS data using RAiDER Package
 # Vertical: would like to interpolate everything from vertically from the lat lon
 
-def extract_param_GNSS_update(df, wm_file_path: str, workLoc: str = '', vertical=False, fixed_hgt=False):
+def extract_param_GNSS(df, wm_file_path: str, workLoc: str = '', vertical=False, fixed_hgt=False):
     Date = np.sort(list(set(df['Date'])))
     for num, i in enumerate(Date):
         print(i)
