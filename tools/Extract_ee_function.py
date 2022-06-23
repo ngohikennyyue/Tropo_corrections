@@ -125,22 +125,21 @@ def list2features(station):
     return multi_point
 
 
-# Extract values from multispectral image by the li
+# Extract values from multispectral image by the point of interest and bands
 # img: Image of interest
 # points_list: list of [lon, lat]
 # bands: list of band names that of interest.
 def sampFeat2array(img, points_list, bands):
     multi_point = list2features(points_list)
     ft = img.sampleRegions(multi_point)
-    for kk in range(len(bands)):
+    for kk, band in enumerate(bands):
         try:
             if kk == 0:
-                dat1 = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(bands[kk])).getInfo()
-                print(len(dat1))
+                dat1 = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
                 dat_full = np.zeros((len(dat1), len(bands)))
                 dat_full[:, kk] = dat1
             else:
-                dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(bands[kk])).getInfo()
+                dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
                 dat_full[:, kk] = dat
         except ee.ee_exception.EEException:
             continue
@@ -158,13 +157,13 @@ def extract_param(file_path: str, time: str, bands: list):
     loc = os.path.dirname(os.path.abspath(file_path))
     name = file_path.split('/')[-1].split('.')[0]
     ext = file_path.split('/')[-1].split('.')[-1]
-    print(name, ext)
+    print(loc, name, ext)
     if ext == 'csv':
         df = pd.read_csv(file_path)
-        df = df[df['Date'] > '2017-07-10']  # GOES data only valid after 20170710
+        df = df[df['Date'] > '2017-12-15']  # GOES data only valid after 20170710
     elif ext == 'ftr':
         df = pd.read_feather(file_path)
-        df = df[df['Date'] > '2017-07-10']  # GOES data only valid after 20170710
+        df = df[df['Date'] > '2017-12-15']  # GOES data only valid after 20170710
     else:
         print('Can not read this file type', ext)
         exit()
@@ -173,6 +172,7 @@ def extract_param(file_path: str, time: str, bands: list):
     for num, i in enumerate(Date):
         print('Extracting...', i)
         dd = df.loc[df['Date'] == i].copy()
+        print(len(dd))
         station = dd[['Lon', 'Lat']].values
         # get GOES 16 image
         img = get_GOES16_image(i + 'T' + time)
@@ -182,20 +182,25 @@ def extract_param(file_path: str, time: str, bands: list):
             # convert feature to array
             ext = sampFeat2array(Img, station.tolist(), bands)
             if len(ext) != len(station):
+                print(len(ext), len(station))
                 print('Mismatching data... Skipped')
+                print('')
                 continue
             else:
                 print('Adding bands to the Dataframe...')
                 for b, band in enumerate(bands):
+                    print(b, band)
                     dd.loc[:, band] = ext[:, b]
                 if num == 0:
+                    print('write first csv')
                     dd.to_csv(loc + '/' + name + '_cloud.csv', index=False)
                 else:
+                    print('append to existed csv')
                     dd.to_csv(loc + '/' + name + '_cloud.csv', index=False, header=False, mode='a')
                 print('Done')
+                print('')
         else:
             print('Empty data... Skipped')
+            print('')
             continue
-    # Data = pd.concat(dataFrame, ignore_index=True)
     print('Finished extraction')
-    # return Data
