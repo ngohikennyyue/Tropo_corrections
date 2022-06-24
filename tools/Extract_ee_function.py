@@ -132,20 +132,21 @@ def list2features(station):
 def sampFeat2array(img, points_list, bands):
     multi_point = list2features(points_list)
     ft = img.sampleRegions(multi_point)
+    data_full = None
     for kk, band in enumerate(bands):
         try:
             if kk == 0:
                 dat1 = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
-                dat_full = np.zeros((len(dat1), len(bands)))
-                dat_full[:, kk] = dat1
+                data_full = np.zeros((len(dat1), len(bands)))
+                data_full[:, kk] = dat1
             else:
                 dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
-                dat_full[:, kk] = dat
+                data_full[:, kk] = dat
         except ee.ee_exception.EEException:
             continue
     # dat_full = pd.DataFrame(dat_full)
     # dat_full.columns = [bands]
-    return dat_full
+    return data_full
 
 
 # function to extract bands value with existed database
