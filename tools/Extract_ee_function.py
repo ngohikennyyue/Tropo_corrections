@@ -130,18 +130,21 @@ def list2features(station):
 # points_list: list of [lon, lat]
 # bands: list of band names that of interest.
 def sampFeat2array(img, points_list, bands):
-    multi_point = list2features(points_list)
-    ft = img.sampleRegions(multi_point)
-    data_full = None
+    multi_point = list2features(points_list.tolist())
+    ft = img.sample(multi_point, dropNulls=False)
     for kk, band in enumerate(bands):
         try:
-            if kk == 0:
-                dat1 = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
-                data_full = np.zeros((len(dat1), len(bands)))
-                data_full[:, kk] = dat1
+            dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
+            if len(dat) == len(points_list):
+                if kk == 0:
+                    dat1 = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
+                    data_full = np.zeros((len(dat1), len(bands)))
+                    data_full[:, kk] = dat1
+                else:
+                    dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
+                    data_full[:, kk] = dat
             else:
-                dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
-                data_full[:, kk] = dat
+                continue
         except ee.ee_exception.EEException:
             continue
     # dat_full = pd.DataFrame(dat_full)
