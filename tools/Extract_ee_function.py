@@ -23,6 +23,19 @@ def applyScaleAndOffset(image, band):
 
 Num_bands = 32
 
+# Function use when selected bands for image
+def applyScaleAndOffset_selected(image):
+  band = image.bandNames().getInfo()
+  bands = [None] * len(band)
+  for i , b in enumerate(band):
+    offset = ee.Number(image.get(b + '_offset'))
+    scale = ee.Number(image.get(b + '_scale'))
+    bands[i] = image.select(b).multiply(scale).add(offset)
+    # num = b.split('_')[-1][-2:]
+    # dqfname =  'DQF_C' + num
+    # bands[i*2 + 1] = image.select(dqfname)
+  return ee.Image(ee.Image(bands).copyProperties(image, image.propertyNames()))
+
 
 def applyScaleAndOffset_all(image):
     bands = [None] * Num_bands
@@ -130,11 +143,12 @@ def list2features(station):
 # points_list: list of [lon, lat]
 # bands: list of band names that of interest.
 def sampFeat2array(img, points_list, bands):
-    multi_point = list2features(points_list.tolist())
-    ft = img.sample(multi_point, dropNulls=False)
+    multi_point = list2features(points_list)
+    ft = img.reduceRegions(multi_point, ee.Reducer.first(),10)
     for kk, band in enumerate(bands):
         try:
             dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
+            print(len(dat), len(points_list))
             if len(dat) == len(points_list):
                 if kk == 0:
                     dat1 = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
@@ -144,8 +158,12 @@ def sampFeat2array(img, points_list, bands):
                     dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
                     data_full[:, kk] = dat
             else:
+                data_full = np.zeros((len(points_list), len(bands)))
+                return data_full
                 continue
         except ee.ee_exception.EEException:
+            data_full = np.zeros((len(points_list), len(bands)))
+            return data_full
             continue
     # dat_full = pd.DataFrame(dat_full)
     # dat_full.columns = [bands]
@@ -164,10 +182,12 @@ def extract_param(file_path: str, time: str, bands: list):
     print(loc, name, ext)
     if ext == 'csv':
         df = pd.read_csv(file_path)
-        df = df[df['Date'] > '2017-12-15']  # GOES data only valid after 20170710
+        df = df[df['Date'] > '2017-12-31']  # GOES data only valid after 20170710
+        df = df[(df['Lat'] > 26) & (df['Lat'] < 48) & (df['Lon'] > -124) & (df['Lon'] < -44)]
     elif ext == 'ftr':
         df = pd.read_feather(file_path)
-        df = df[df['Date'] > '2017-12-15']  # GOES data only valid after 20170710
+        df = df[df['Date'] > '2017-07-10']  # GOES data only valid after 20170710
+        df = df[(df['Lat'] > 26) & (df['Lat'] < 48) & (df['Lon'] > -124) & (df['Lon'] < -44)]
     else:
         print('Can not read this file type', ext)
         exit()
