@@ -23,18 +23,19 @@ def applyScaleAndOffset(image, band):
 
 Num_bands = 32
 
+
 # Function use when selected bands for image
 def applyScaleAndOffset_selected(image):
-  band = image.bandNames().getInfo()
-  bands = [None] * len(band)
-  for i , b in enumerate(band):
-    offset = ee.Number(image.get(b + '_offset'))
-    scale = ee.Number(image.get(b + '_scale'))
-    bands[i] = image.select(b).multiply(scale).add(offset)
-    # num = b.split('_')[-1][-2:]
-    # dqfname =  'DQF_C' + num
-    # bands[i*2 + 1] = image.select(dqfname)
-  return ee.Image(ee.Image(bands).copyProperties(image, image.propertyNames()))
+    band = image.bandNames().getInfo()
+    bands = [None] * len(band)
+    for i, b in enumerate(band):
+        offset = ee.Number(image.get(b + '_offset'))
+        scale = ee.Number(image.get(b + '_scale'))
+        bands[i] = image.select(b).multiply(scale).add(offset)
+        # num = b.split('_')[-1][-2:]
+        # dqfname =  'DQF_C' + num
+        # bands[i*2 + 1] = image.select(dqfname)
+    return ee.Image(ee.Image(bands).copyProperties(image, image.propertyNames()))
 
 
 def applyScaleAndOffset_all(image):
@@ -144,7 +145,7 @@ def list2features(station):
 # bands: list of band names that of interest.
 def sampFeat2array(img, points_list, bands):
     multi_point = list2features(points_list)
-    ft = img.reduceRegions(multi_point, ee.Reducer.first(),10)
+    ft = img.reduceRegions(multi_point, ee.Reducer.first(), 10)
     for kk, band in enumerate(bands):
         try:
             dat = ft.toList(len(points_list)).map(lambda feature: ee.Feature(feature).get(band)).getInfo()
