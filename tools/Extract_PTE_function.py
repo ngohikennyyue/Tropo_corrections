@@ -24,8 +24,8 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
 from tensorflow.keras.losses import Huber
 
-# from tensorflow.keras.callbacks import EarlyStopping
-# from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
 
 hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400
     , 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000
@@ -74,12 +74,12 @@ def standardized(x, scaler):
 #     (0.8, '#78d151'),
 #     (1, '#fde624'),
 # ], N=256)
-#
-#
-# def using_mpl_scatter_density(fig, x, y):
-#     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
-#     density = ax.scatter_density(x, y, cmap=white_viridis)
-#     fig.colorbar(density, label='Number of points per pixel')
+
+
+def using_mpl_scatter_density(fig, x, y):
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(x, y, cmap=white_viridis)
+    fig.colorbar(density, label='Number of points per pixel')
 
 
 # Extract value from raster and their lat/lon grid of the bounding area
@@ -179,10 +179,37 @@ def PTE_interp(wm, loc, df):
 
     return df
 
+# Prepare data and scale them accordingly
+# train: training data
+# test: testing data
+# variable: data that is of interest from training set and testing set
+def process_PTE_data(train, test, variable):
+    if not isinstance(variable, (str, list, tuple)):
+        raise TypeError("Variable not of type str")
+    else:
+        cs = MinMaxScaler()
+        trainX = cs.fit_transform(train[train.columns[pd.Series(train.columns).str.startswith(variable)]])
+        testX = cs.transform(test[test.columns[pd.Series(test.columns).str.startswith(variable)]])
+        return trainX, testX, cs
+
+# Create the sequential model with specific nodes and dimensions.
+# dim: input dimensions
+# nodes: a list of node in each layer e.g. [256, 128,64, 32]
+# regress: return the last node as the output in linear
+def create_mlp(dim, nodes, regress=False):
+    model = Sequential()
+    for i, n in enumerate(nodes):
+        if i == 0:
+            model.add(Dense(n, input_dim=dim, activation='relu'))
+        else:
+            model.add(Dense(n, activation='relu'))
+    if regress:
+        model.add(Dense(1, activation='linear'))
+
+    return model
 
 # Get an array of distance from the each pixel to the weather model nodes
 def get_distance(grid, ds):
-    from scipy.spatial.distance import cdist
     lons = ds.x.values
     lats = ds.y.values
     X, Y = np.meshgrid(lons, lats)
@@ -279,7 +306,7 @@ def extract_param_GNSS(df, wm_file_path: str, workLoc: str = '', vertical=False,
     print('Finished extraction.')
 
 
-def extract_param_GNSS_4Closest(df, wm_file_path: str, workLoc: str = '', k=4, vertical=False, fixed_hgt=False):
+def extract_param_GNSS_4Closest(df, wm_file_path: str, workLoc: str = '', k=4, vertical=True, fixed_hgt=False):
     Date = np.sort(list(set(df['Date'])))
     for num, i in enumerate(Date):
         print(i)
@@ -344,4 +371,62 @@ def extract_param_GNSS_4Closest(df, wm_file_path: str, workLoc: str = '', k=4, v
                 else:
                     data.to_csv(workLoc + 'PTE_closest_4Nodes_vert.csv', mode='a', index=False, header=False)
                 print('Extracted date ', i)
+    print('Finished extraction.')
+
+
+def extract_wethydro_GNSS(df, wm_file_path: str, workLoc: str = '', fixed_hgt=False):
+    Date = np.sort(list(set(df['Date'])))
+    for num, i in enumerate(Date):
+        print(i)
+        dd = df.loc[df['Date'] == i]
+        date = i.replace('-', '_')  # Retrieve the date of the GNSS for NWM
+
+        path_name = glob.glob(wm_file_path + 'ERA-5_{date}*[A-Z].nc'.format(date=date))
+        print(path_name)
+        try:
+            ds = xr.load_dataset(" ".join(path_name))  # xr to read the weather model
+            # dd = dd[(dd['Lon'] >= ds.x.min())& (dd['Lon']<= ds.x.max())&(dd['Lat'] >= ds.y.min())& (dd['Lat']<= ds.y.max())]
+            loc = dd[['Lon', 'Lat', 'Hgt_m']].values
+        except:
+            print('Can not read weather model')
+            continue
+        if not fixed_hgt:
+            # Get coordinate of the GPS station
+            x = xr.DataArray(dd['Lon'].ravel(), dims='x')
+            y = xr.DataArray(dd['Lat'].ravel(), dims='y')
+            z = ds.z.values
+
+            # Interp and extract data
+            wet = ds.wet.interp(x=x, y=y).values.transpose().diagonal().transpose()
+            hydro = ds.hydro.interp(x=x, y=y).values.transpose().diagonal().transpose()
+            total = pd.DataFrame(wet + hydro)
+            data = pd.concat([dd.reset_index(drop=True), total], axis=1, ignore_index=True)
+
+            if num == 0:
+                name = ['total_' + str(i) for i in range(1, len(z) + 1)]
+                data.columns = np.concatenate((df.columns, name))
+                data.to_csv(workLoc + 'nodes_delay_vert.csv', index=False)
+            else:
+                data.to_csv(workLoc + 'nodes_delay_vert.csv', mode='a', index=False, header=False)
+            print('Done', i)
+
+        else:
+            # Get coordinate of the GPS station
+            x = xr.DataArray(dd['Lon'].ravel(), dims='x')
+            y = xr.DataArray(dd['Lat'].ravel(), dims='y')
+            z = xr.DataArray(hgtlvs, dims='z')
+
+            # Interp and extract data
+            wet = ds.wet.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+            hydro = ds.hydro.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+            total = pd.DataFrame(wet + hydro)
+            data = pd.concat([dd.reset_index(drop=True), total], axis=1, ignore_index=True)
+
+            if num == 0:
+                name = ['total_' + str(i) for i in range(1, len(z) + 1)]
+                data.columns = np.concatenate((df.columns, name))
+                data.to_csv(workLoc + 'node_delay_vert_fixed_hgtlvs.csv', index=False)
+            else:
+                data.to_csv(workLoc + 'node_delay_vert_fixed_hgtlvs.csv', mode='a', index=False, header=False)
+            print('Done', i)
     print('Finished extraction.')
