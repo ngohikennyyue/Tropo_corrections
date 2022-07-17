@@ -21,7 +21,9 @@ df = df[df['sigZTD'] < 0.1]
 #           14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
 # Load Model
 Norm_model = tf.keras.models.load_model('../ML/Model/Full_US_WE_PTE_fixed_hgtlvs_model')
-Multi_model = tf.keras.models.load_model('../ML/Multiple_Input_Model/Model/Test_New_model3_US_PTE_fixed_hgtlvs_cloud_model')
+Multi_model = tf.keras.models.load_model('../ML/Multiple_Input_Model/Model'
+                                         '/Test_New_model3_US_PTE_fixed_hgtlvs_cloud_model')
+wet_hydro_model = tf.keras.models.load_model('../ML/Wet_hydro_model/Model/wet_hydro_US_PTE_fixed_hgtlvs_model')
 # Load scaler
 scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
 scaler_y = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
@@ -39,7 +41,8 @@ E = df[df.columns[pd.Series(df.columns).str.startswith(('Lat', 'Hgt_m', 'e_'))]]
 # Predict
 predict1 = scaler_y.inverse_transform(Norm_model.predict(scaler_x.transform(X)))
 true = df[['ZTD']].values
-predict2 = scaler_y1.inverse_transform(Multi_model.predict([scalerP.transform(P), scalerT.transform(T), scalerE.transform(E)]))
+predict2 = scaler_y1.inverse_transform(
+    Multi_model.predict([scalerP.transform(P), scalerT.transform(T), scalerE.transform(E)]))
 print('')
 print('Normal_model:')
 print('Predict: ', predict1[:5].ravel())
@@ -49,6 +52,7 @@ print('Multi_input model:')
 print('Predict: ', predict2[:5].ravel())
 print('True: ', true[:5].ravel())
 from sklearn.metrics import mean_squared_error, r2_score
+
 print('')
 print("Normal model")
 # The mean squared error

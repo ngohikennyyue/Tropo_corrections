@@ -23,7 +23,8 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
 from tensorflow.keras.losses import Huber
-
+from tensorflow.keras.layers import Dense, concatenate, Dropout
+from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
 
@@ -61,19 +62,19 @@ def standardized(x, scaler):
     return X, sc
 
 
-# import mpl_scatter_density  # adds projection='scatter_density'
-# from matplotlib.colors import LinearSegmentedColormap
-#
-# # "Viridis-like" colormap with white background
-# white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
-#     (0, '#ffffff'),
-#     (1e-20, '#440053'),
-#     (0.2, '#404388'),
-#     (0.4, '#2a788e'),
-#     (0.6, '#21a784'),
-#     (0.8, '#78d151'),
-#     (1, '#fde624'),
-# ], N=256)
+import mpl_scatter_density  # adds projection='scatter_density'
+from matplotlib.colors import LinearSegmentedColormap
+
+# "Viridis-like" colormap with white background
+white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
+    (0, '#ffffff'),
+    (1e-20, '#440053'),
+    (0.2, '#404388'),
+    (0.4, '#2a788e'),
+    (0.6, '#21a784'),
+    (0.8, '#78d151'),
+    (1, '#fde624'),
+], N=256)
 
 
 def using_mpl_scatter_density(fig, x, y):
@@ -179,6 +180,7 @@ def PTE_interp(wm, loc, df):
 
     return df
 
+
 # Prepare data and scale them accordingly
 # train: training data
 # test: testing data
@@ -191,6 +193,7 @@ def process_PTE_data(train, test, variable):
         trainX = cs.fit_transform(train[train.columns[pd.Series(train.columns).str.startswith(variable)]])
         testX = cs.transform(test[test.columns[pd.Series(test.columns).str.startswith(variable)]])
         return trainX, testX, cs
+
 
 # Create the sequential model with specific nodes and dimensions.
 # dim: input dimensions
@@ -207,6 +210,7 @@ def create_mlp(dim, nodes, regress=False):
         model.add(Dense(1, activation='linear'))
 
     return model
+
 
 # Get an array of distance from the each pixel to the weather model nodes
 def get_distance(grid, ds):
@@ -325,7 +329,7 @@ def extract_param_GNSS_4Closest(df, wm_file_path: str, workLoc: str = '', k=4, v
         except:
             print('Can not read weather model')
             continue
-        if not vertical: # Might need to cancel this
+        if not vertical:  # Might need to cancel this
             # Create interpreter for each param
             data = PTE_interp(ds, loc, dd)
             if num == 0:
@@ -340,15 +344,16 @@ def extract_param_GNSS_4Closest(df, wm_file_path: str, workLoc: str = '', k=4, v
             if fixed_hgt:
                 z = xr.DataArray(hgtlvs, dims='z')
 
-                P = pd.DataFrame(ds.p.interp(z=z).transpose().values[row,col,:].reshape(len(loc), len(hgtlvs)*k))
-                T = pd.DataFrame(ds.t.interp(z=z).transpose().values[row,col,:].reshape(len(loc), len(hgtlvs)*k))
-                e = pd.DataFrame(ds.e.interp(z=z).transpose().values[row,col,:].reshape(len(loc), len(hgtlvs)*k))
+                P = pd.DataFrame(ds.p.interp(z=z).transpose().values[row, col, :].reshape(len(loc), len(hgtlvs) * k))
+                T = pd.DataFrame(ds.t.interp(z=z).transpose().values[row, col, :].reshape(len(loc), len(hgtlvs) * k))
+                e = pd.DataFrame(ds.e.interp(z=z).transpose().values[row, col, :].reshape(len(loc), len(hgtlvs) * k))
                 data = pd.concat([dd.reset_index(drop=True), P, T, e, pd.DataFrame(close4_dist)], axis=1,
                                  ignore_index=True)
                 if num == 0:
                     name = ['P_' + str(i) for i in range(1, len(hgtlvs) * k + 1)] + ['T_' + str(i) for i in
                                                                                      range(1, len(hgtlvs) * k + 1)] + [
-                               'e_' + str(i) for i in range(1, len(hgtlvs) * k + 1)] + ['dist_' + str(i) for i in range(1, k+1)]
+                               'e_' + str(i) for i in range(1, len(hgtlvs) * k + 1)] + ['dist_' + str(i) for i in
+                                                                                        range(1, k + 1)]
                     data.columns = np.concatenate((df.columns, name))
                     data.to_csv(workLoc + 'PTE_closest_4Nodes_vert_fixed_hgtlvs.csv', index=False)
                 else:
@@ -365,7 +370,8 @@ def extract_param_GNSS_4Closest(df, wm_file_path: str, workLoc: str = '', k=4, v
                 if num == 0:
                     name = ['P_' + str(i) for i in range(1, len(ds.z) * k + 1)] + ['T_' + str(i) for i in
                                                                                    range(1, len(ds.z) * k + 1)] + [
-                               'e_' + str(i) for i in range(1, len(ds.z) * k + 1)] + ['dist_' + str(i) for i in range(1, k+1)]
+                               'e_' + str(i) for i in range(1, len(ds.z) * k + 1)] + ['dist_' + str(i) for i in
+                                                                                      range(1, k + 1)]
                     data.columns = np.concatenate((df.columns, name))
                     data.to_csv(workLoc + 'PTE_closest_4Nodes_vert.csv', index=False)
                 else:
@@ -374,8 +380,10 @@ def extract_param_GNSS_4Closest(df, wm_file_path: str, workLoc: str = '', k=4, v
     print('Finished extraction.')
 
 
-def extract_wethydro_GNSS(df, wm_file_path: str, workLoc: str = '', fixed_hgt=False):
+def extract_wethydro_GNSS(df, wm_file_path: str, fixed_hgt=False):
     Date = np.sort(list(set(df['Date'])))
+    file_path = os.getcwd()
+    file_name = os.getcwd().split('/')[-1]
     for num, i in enumerate(Date):
         print(i)
         dd = df.loc[df['Date'] == i]
@@ -385,8 +393,7 @@ def extract_wethydro_GNSS(df, wm_file_path: str, workLoc: str = '', fixed_hgt=Fa
         print(path_name)
         try:
             ds = xr.load_dataset(" ".join(path_name))  # xr to read the weather model
-            # dd = dd[(dd['Lon'] >= ds.x.min())& (dd['Lon']<= ds.x.max())&(dd['Lat'] >= ds.y.min())& (dd['Lat']<= ds.y.max())]
-            loc = dd[['Lon', 'Lat', 'Hgt_m']].values
+            # loc = dd[['Lon', 'Lat', 'Hgt_m']].values
         except:
             print('Can not read weather model')
             continue
@@ -405,9 +412,9 @@ def extract_wethydro_GNSS(df, wm_file_path: str, workLoc: str = '', fixed_hgt=Fa
             if num == 0:
                 name = ['total_' + str(i) for i in range(1, len(z) + 1)]
                 data.columns = np.concatenate((df.columns, name))
-                data.to_csv(workLoc + 'nodes_delay_vert.csv', index=False)
+                data.to_csv(file_path + '/' + file_name + '_nodes_delay_vert.csv', index=False)
             else:
-                data.to_csv(workLoc + 'nodes_delay_vert.csv', mode='a', index=False, header=False)
+                data.to_csv(file_path + '/' + file_name + '_nodes_delay_vert.csv', mode='a', index=False, header=False)
             print('Done', i)
 
         else:
@@ -425,8 +432,9 @@ def extract_wethydro_GNSS(df, wm_file_path: str, workLoc: str = '', fixed_hgt=Fa
             if num == 0:
                 name = ['total_' + str(i) for i in range(1, len(z) + 1)]
                 data.columns = np.concatenate((df.columns, name))
-                data.to_csv(workLoc + 'node_delay_vert_fixed_hgtlvs.csv', index=False)
+                data.to_csv(file_path + '/' + file_name + '_node_delay_vert_fixed_hgtlvs.csv', index=False)
             else:
-                data.to_csv(workLoc + 'node_delay_vert_fixed_hgtlvs.csv', mode='a', index=False, header=False)
+                data.to_csv(file_path + '/' + file_name + '_node_delay_vert_fixed_hgtlvs.csv', mode='a', index=False,
+                            header=False)
             print('Done', i)
     print('Finished extraction.')

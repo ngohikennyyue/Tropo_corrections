@@ -22,8 +22,9 @@ df = df[df['sigZTD'] < 0.1]
 #           14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
 # Load Model
 Norm_model = tf.keras.models.load_model('../ML/Model/Full_US_WE_PTE_fixed_hgtlvs_model')
-Multi_model = tf.keras.models.load_model(
-    '../ML/Multiple_Input_Model/Model/Test_New_model3_US_PTE_fixed_hgtlvs_cloud_model')
+Multi_model = tf.keras.models.load_model('../ML/Multiple_Input_Model/Model'
+                                         '/Test_New_model3_US_PTE_fixed_hgtlvs_cloud_model')
+wet_hydro_model = tf.keras.models.load_model('../ML/Wet_hydro_model/Model/wet_hydro_US_PTE_fixed_hgtlvs_model')
 # Load scaler
 scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
 scaler_y = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
