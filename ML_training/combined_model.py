@@ -49,6 +49,8 @@ def create_mlp(dim, nodes, regress=False):
 
 print('Read data...')
 data = pd.read_csv('../../GNSS_US/US/NewPTE_vert_fixed_hgtlvs.csv')
+data = data.dropna()
+data = data[data['sigZTD'] < 0.1]
 train, test = train_test_split(data, test_size=0.3, random_state=40)
 # train = data[data['Date'] > '2017-12-31']
 # test = data[data['Date'] < '2018-01-01']
@@ -65,6 +67,7 @@ trainE, testE, eScaler = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'e_'))
 trainX, testX, xScaler = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))
 
 from joblib import dump, load
+
 dump(pScaler, 'Scaler/combined_model_pScaler_x.bin', compress=True)
 dump(tScaler, 'Scaler/combined_model_tScaler_x.bin', compress=True)
 dump(eScaler, 'Scaler/combined_model_eScaler_x.bin', compress=True)
@@ -92,7 +95,7 @@ xy = Dense(25, activation='relu')(xy)
 xy = Dense(25, activation='relu')(xy)
 xy = Dense(1, activation='linear')(xy)
 model1 = Model(inputs=[p_model.input, t_model.input, e_model.input], outputs=xy,
-              name='PTE_ZTD_pred_model')
+               name='PTE_ZTD_pred_model')
 # Model 2 (normal PTE)
 dim = layers.Input(trainX.shape[1], )
 model2 = create_mlp(dim.shape[1], [155, 80, 40, 20, 10, 5], regress=True)
@@ -100,8 +103,6 @@ model2 = create_mlp(dim.shape[1], [155, 80, 40, 20, 10, 5], regress=True)
 # Combined Model
 Combined = concatenate([model1.output, model2.output])
 out = Dense(8, activation='relu')(Combined)
-out = Dense(4, activation='relu')(out)
-out = Dense(2, activation='relu')(out)
 out = Dense(1, activation='linear')(out)
 
 final_model = Model(inputs=[model1.input, model2.input], outputs=out, name='PTE_combined_model')
@@ -116,8 +117,8 @@ final_model.compile(optimizer=opt, loss=['MSE'])
 print('Model compiled...')
 # Train the ANN on the Training set
 final_model.fit(x=[trainP, trainT, trainE, trainX], y=trainY, batch_size=1500, epochs=150,
-          validation_data=([testP, testT, testE, testX], testY),
-          callbacks=[es], verbose=0)
+                validation_data=([testP, testT, testE, testX], testY),
+                callbacks=[es], verbose=0)
 # Plot history: MSE
 plt.plot(final_model.history.history['loss'], label='Loss (training data)')
 plt.plot(final_model.history.history['val_loss'], label='Loss (validation data)')
@@ -164,6 +165,7 @@ plt.ylabel('Predicted', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
 fig.suptitle('Observe vs Predict')
 fig.savefig('Plots/combined_model_Ob_v_Pred.png', dpi=300)
+plt.clf()
 
 # Plot of residual of the prediction
 fig = plt.figure()
@@ -177,3 +179,4 @@ plt.ylabel('Residual', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
 fig.suptitle('Residual vs true')
 fig.savefig('Plots/combined_model_Resid_true.png', dpi=300)
+plt.clf()

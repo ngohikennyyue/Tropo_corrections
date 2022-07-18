@@ -77,6 +77,20 @@ white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
 ], N=256)
 
 
+def get_datetime():
+    pass
+
+
+# add time margin for an input datetime
+def datetime_gen(date_time, time_for='%Y-%m-%dT%H:%M:%S', margin=5):
+    from datetime import datetime
+    from datetime import timedelta
+    given_time = datetime.strptime(date_time, time_for)
+    start_time = (given_time - timedelta(minutes=margin)).strftime(time_for)
+    end_time = (given_time + timedelta(minutes=margin)).strftime(time_for)
+    return start_time, end_time
+
+
 def using_mpl_scatter_density(fig, x, y):
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
     density = ax.scatter_density(x, y, cmap=white_viridis)
