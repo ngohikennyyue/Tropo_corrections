@@ -77,18 +77,24 @@ white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
 ], N=256)
 
 
-def get_datetime():
-    pass
+def get_datetime(date):
+    date1 = datetime.strptime(date.split('_')[0], '%Y%m%d').strftime('%Y_%m_%d')
+    date2 = datetime.strptime(date.split('_')[-1], '%Y%m%d').strftime('%Y_%m_%d')
+    return date1, date2
 
 
-# add time margin for an input datetime
-def datetime_gen(date_time, time_for='%Y-%m-%dT%H:%M:%S', margin=5):
+# Get the closest up and floor hour of the acquisition of InSAR
+# date: date of the weather model needed e.g. 2019_01_12
+# time: time of the InSAR acquire e.g. T11:31:00
+# time_for: the datetime format that is require
+def datetime_gen(date: str, time: str, time_for='%Y_%m_%dT%H_%M_%S'):
     from datetime import datetime
     from datetime import timedelta
-    given_time = datetime.strptime(date_time, time_for)
-    start_time = (given_time - timedelta(minutes=margin)).strftime(time_for)
-    end_time = (given_time + timedelta(minutes=margin)).strftime(time_for)
-    return start_time, end_time
+    given_time = datetime.strptime(date + time, time_for)
+    minute = given_time.min
+    start_time = (given_time.replace(microsecond=0, second=0, minute=0)).strftime(time_for)
+    end_time = (given_time.replace(microsecond=0, second=0, minute=0) + timedelta(hours=1)).strftime(time_for)
+    return start_time, end_time, minute
 
 
 def using_mpl_scatter_density(fig, x, y):

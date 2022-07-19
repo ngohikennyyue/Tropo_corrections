@@ -1,7 +1,7 @@
 import sys
 import os
 
-import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 
 current = os.path.dirname(os.path.realpath('extract_func'))
@@ -26,14 +26,19 @@ tf.config.threading.set_intra_op_parallelism_threads(num_threads)
 tf.config.set_soft_device_placement(True)
 
 
-def process_PTE_data(train, test, variable):
+def process_PTE_data(train, test, variable, scale=False):
     if not isinstance(variable, (str, list, tuple)):
         raise TypeError("Variable not of type str")
     else:
-        cs = MinMaxScaler()
-        trainX = cs.fit_transform(train[train.columns[pd.Series(train.columns).str.startswith(variable)]])
-        testX = cs.transform(test[test.columns[pd.Series(test.columns).str.startswith(variable)]])
-        return trainX, testX, cs
+        if scale:
+            cs = MinMaxScaler()
+            trainX = cs.fit_transform(train[train.columns[pd.Series(train.columns).str.startswith(variable)]])
+            testX = cs.transform(test[test.columns[pd.Series(test.columns).str.startswith(variable)]])
+            return trainX, testX, cs
+        else:
+            trainX = train[train.columns[pd.Series(train.columns).str.startswith(variable)]]
+            testX = test[test.columns[pd.Series(test.columns).str.startswith(variable)]]
+            return trainX, testX
 
 
 def create_mlp(dim, nodes, regress=False):
@@ -58,85 +63,73 @@ train, test = train_test_split(data, test_size=0.3, random_state=40)
 # test = data[data['Date'] < '2018-01-01']
 
 # Scale Target
-cs = MinMaxScaler()
-trainY = cs.fit_transform(train[['ZTD']])
-testY = cs.transform(test[['ZTD']])
+# cs = MinMaxScaler()
+# trainY = cs.fit_transform(train[['ZTD']])
+# testY = cs.transform(test[['ZTD']])
+trainY = train[['ZTD']].values
+testY = test[['ZTD']].values
 
 print('Create training and testing sets...')
-trainP, testP, pScaler = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'P_'))
-trainT, testT, tScaler = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'T_'))
-trainE, testE, eScaler = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'e_'))
-trainX, testX, xScaler = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))
+trainP, testP = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'P_'))
+trainT, testT = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'T_'))
+trainE, testE = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'e_'))
+trainX, testX = process_PTE_data(train, test, ('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))
 
+# Load model
+Norm_model = tf.keras.models.load_model('../Model/Full_US_PTE_fixed_hgtlvs_model')
+Multi_model = tf.keras.models.load_model(
+    '../Multiple_Input_Model/Model/Test_New_model3_US_PTE_fixed_hgtlvs_cloud_model')
 from joblib import dump, load
 
-dump(pScaler, 'Scaler/combined_model_pScaler_x.bin', compress=True)
-dump(tScaler, 'Scaler/combined_model_tScaler_x.bin', compress=True)
-dump(eScaler, 'Scaler/combined_model_eScaler_x.bin', compress=True)
-dump(xScaler, 'Scaler/combined_model_xScaler_x.bin', compress=True)
-dump(cs, 'Scaler/Test_New_model3_scaler_y.bin', compress=True)
+# Load scaler
+scaler_x = load('../Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
+scaler_y = load('../Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
+scalerP = load('../Multiple_Input_Model/Scaler/Test_New_model3_pScaler_x.bin')
+scalerT = load('../Multiple_Input_Model/Scaler/Test_New_model3_tScaler_x.bin')
+scalerE = load('../Multiple_Input_Model/Scaler/Test_New_model3_eScaler_x.bin')
+scaler_y1 = load('../Multiple_Input_Model/Scaler/Test_New_model3_scaler_y.bin')
 
-# Model 1
-InputP = layers.Input(53, )
-InputT = layers.Input(53, )
-InputE = layers.Input(53, )
+pred_1 = scaler_y.inverse_transform(Norm_model.predict(scaler_x.transform(trainX)))
+pred_2 = scaler_y1.inverse_transform(
+    Multi_model.predict([scalerP.transform(trainP), scalerT.transform(trainT), scalerE.transform(trainE)]))
 
-# P model
-p_model = create_mlp(InputP.shape[1], [53, 25, 10])
+input = np.hstack((pred_1.reshape(-1, 1), pred_2.reshape(-1, 1)))
 
-# T model
-t_model = create_mlp(InputT.shape[1], [53, 25, 10])
+# Initialiizinig the ANN
+model = tf.keras.models.Sequential()
+# Input layer
+model.add(tf.keras.layers.Input(shape=(2,)))
+# Adding first hidden layer
+model.add(tf.keras.layers.Dense(units=2, activation=PReLU(), kernel_initializer='he_uniform'))
+# Adding the output layer
+model.add(tf.keras.layers.Dense(units=1, activation='linear'))
+# Compilling the ANN
+model.compile(optimizer='adam', loss=['MSE'], metrics=['MAE'])
 
-# E model
-e_model = create_mlp(InputE.shape[1], [53, 25, 10])
-
-combined = concatenate([p_model.output, t_model.output, e_model.output])
-xy = Dense(53, activation='relu')(combined)
-xy = Dense(53, activation='relu')(xy)
-xy = Dense(25, activation='relu')(xy)
-xy = Dense(25, activation='relu')(xy)
-xy = Dense(1, activation='linear')(xy)
-model1 = Model(inputs=[p_model.input, t_model.input, e_model.input], outputs=xy,
-               name='PTE_ZTD_pred_model')
-# Model 2 (normal PTE)
-dim = layers.Input(trainX.shape[1], )
-model2 = create_mlp(dim.shape[1], [155, 80, 40, 20, 10, 5], regress=True)
-
-# Combined Model
-Combined = concatenate([model1.output, model2.output])
-out = Dense(2, activation='relu')(Combined)
-out = Dense(1, activation='linear')(out)
-
-final_model = Model(inputs=[model1.input, model2.input], outputs=out, name='PTE_combined_model')
-plot_model(final_model, 'Plots/combined_model.png', show_shapes=True)
-
-print(final_model.summary())
-
-es = EarlyStopping(verbose=1, patience=10)
-# Compile model
-opt = Adam(learning_rate=1e-8)
-final_model.compile(optimizer=opt, loss=['MSE'])
-print('Model compiled...')
 # Train the ANN on the Training set
-final_model.fit(x=[trainP, trainT, trainE, trainX], y=trainY, batch_size=1500, epochs=150,
-                validation_data=([testP, testT, testE, testX], testY),
-                callbacks=[es], verbose=0)
+model.fit(input, trainY, batch_size=1500, epochs=150, validation_split=0.2, verbose=0)
+
 # Plot history: MSE
-plt.plot(final_model.history.history['loss'], label='Loss (training data)')
-plt.plot(final_model.history.history['val_loss'], label='Loss (validation data)')
+plt.plot(model.history.history['loss'], label='Loss (training data)')
+plt.plot(model.history.history['val_loss'], label='Loss (validation data)')
 plt.title('MSE for noise prediction')
 plt.ylabel('MSE value')
 plt.xlabel('No. epoch')
 plt.legend(loc="upper left")
-plt.savefig('Plots/combined_model_MSE_history.png', dpi=300)
+plt.savefig('Plots/combined_model_mod_MSE_history.png', dpi=300)
 plt.clf()
 
 # Saving model
-final_model.save('Model/combined_model_US_PTE_fixed_hgtlvs_model')
+model.save('Model/combined_model_mod_US_PTE_fixed_hgtlvs_model')
 
 # Predict different model
-predict = cs.inverse_transform(final_model.predict([testP, testT, testE, testX]))
-true = cs.inverse_transform(testY)
+test_1 = scaler_y.inverse_transform(Norm_model.predict(scaler_x.transform(testX)))
+test_2 = scaler_y1.inverse_transform(
+    Multi_model.predict([scalerP.transform(testP), scalerT.transform(testT), scalerE.transform(testE)]))
+test_join = np.hstack((test_1.reshape(-1, 1), test_2.reshape(-1, 1)))
+
+predict = model.predict(test_join)
+true = testY
 
 print(predict[:5], true[:5])
 from sklearn.metrics import mean_squared_error, r2_score
@@ -164,10 +157,9 @@ cbar.set_label(label='Number of points per pixel', size=10)
 ax.tick_params(axis='both', which='major', labelsize=10)
 plt.xlabel('Observed', fontsize=10)
 plt.ylabel('Predicted', fontsize=10)
-plt.xlim(predict.min(), predict.max())
 cbar.ax.tick_params(labelsize=10)
 fig.suptitle('Observe vs Predict')
-fig.savefig('Plots/combined_model_Ob_v_Pred.png', dpi=300)
+fig.savefig('Plots/combined_model_mod_Ob_v_Pred.png', dpi=300)
 plt.clf()
 
 # Plot of residual of the prediction
@@ -179,9 +171,7 @@ cbar.set_label(label='Number of points per pixel', size=10)
 ax.tick_params(axis='both', which='major', labelsize=10)
 plt.xlabel('True', fontsize=10)
 plt.ylabel('Residual', fontsize=10)
-plt.xlim(predict.min(), predict.max())
-plt.ylim(-0.06, 0.06)
 cbar.ax.tick_params(labelsize=10)
 fig.suptitle('Residual vs true')
-fig.savefig('Plots/combined_model_Resid_true.png', dpi=300)
+fig.savefig('Plots/combined_model_mod_Resid_true.png', dpi=300)
 plt.clf()

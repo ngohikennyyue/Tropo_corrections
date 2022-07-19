@@ -26,7 +26,7 @@ dat = dat[dat['sigZTD'] < 0.1]
 Norm_model = tf.keras.models.load_model('../ML/Model/Full_US_PTE_fixed_hgtlvs_model')
 Multi_model = tf.keras.models.load_model('../ML/Multiple_Input_Model/Model'
                                          '/Test_New_model3_US_PTE_fixed_hgtlvs_cloud_model')
-wet_hydro_model = tf.keras.models.load_model('../ML/Wet_hydro_model/Model/wet_hydro_US_PTE_fixed_hgtlvs_model')
+wet_hydro_model = tf.keras.models.load_model('../ML/Wet_hydro_model/Model/Full_wet_hydro_US_PTE_fixed_hgtlvs_model')
 # Load scaler
 scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
 scaler_y = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
@@ -34,8 +34,8 @@ scalerP = load('../ML/Multiple_Input_Model/Scaler/Test_New_model3_pScaler_x.bin'
 scalerT = load('../ML/Multiple_Input_Model/Scaler/Test_New_model3_tScaler_x.bin')
 scalerE = load('../ML/Multiple_Input_Model/Scaler/Test_New_model3_eScaler_x.bin')
 scaler_y1 = load('../ML/Multiple_Input_Model/Scaler/Test_New_model3_scaler_y.bin')
-wet_scaler_x = load('../ML/Wet_hydro_model/Scaler/wet_hydro_model_scaler_x.bin')
-wet_scaler_y = load('../ML/Wet_hydro_model/Scaler/wet_hydro_model_scaler_y.bin')
+wet_scaler_x = load('../ML/Wet_hydro_model/Scaler/Full_wet_hydro_model_scaler_x.bin')
+wet_scaler_y = load('../ML/Wet_hydro_model/Scaler/Full_wet_hydro_model_scaler_y.bin')
 
 # Obtain the input variables
 X = df[df.columns[pd.Series(df.columns).str.startswith(('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))]]
@@ -141,7 +141,7 @@ plt.xlabel('Observed', fontsize=10)
 plt.ylabel('Predicted', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
 fig.suptitle('Wet Hydro model obs vs pred')
-fig.savefig('Plots/Mexico/wet_hydro_model_Ob_v_Pred.png', dpi=300)
+fig.savefig('Plots/Mexico/Full_wet_hydro_model_Ob_v_Pred.png', dpi=300)
 
 # Plot of residual of the prediction
 fig = plt.figure()
@@ -180,7 +180,7 @@ plt.xlabel('True', fontsize=10)
 plt.ylabel('Residual', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
 fig.suptitle('Wet Hydro model Residual')
-fig.savefig('Plots/Mexico/wet_hydro_model_Resid_true.png', dpi=300)
+fig.savefig('Plots/Mexico/Full_wet_hydro_model_Resid_true.png', dpi=300)
 
 # G-matrix comparison
 G = np.stack((predict1.ravel(), predict2.ravel(), np.ones_like(predict1.ravel())), axis=1)

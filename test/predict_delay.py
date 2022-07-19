@@ -23,14 +23,19 @@ hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200,
           5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000, 11000, 12000, 13000,
           14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
 # Load Model
-GOES_model = tf.keras.models.load_model('../../ML/Model/Full_US_WE_PTE_fixed_hgtlvs_cloud_model')
-Norm_model = tf.keras.models.load_model('../../ML/Model/Full_US_WE_PTE_fixed_hgtlvs_model')
+# GOES_model = tf.keras.models.load_model('../../ML/Model/Full_US_WE_PTE_fixed_hgtlvs_cloud_model')
+Norm_model = tf.keras.models.load_model('../../ML/Model/Full_US_PTE_fixed_hgtlvs_model')
 
 # Load scaler
-scaler_x_g = load('../../ML/Scaler/US_WE_MinMax_scaler_x.bin')
-scaler_y_g = load('../../ML/Scaler/US_WE_MinMax_scaler_y.bin')
-scaler_x = load('../../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
-scaler_y = load('../../ML/Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
+# scaler_x_g = load('../../ML/Scaler/US_WE_MinMax_scaler_x.bin')
+# scaler_y_g = load('../../ML/Scaler/US_WE_MinMax_scaler_y.bin')
+scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
+scaler_y = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
+
+
+def interpolate_wm_time(date, time, ):
+    time = time.strptime
+
 
 for i, date in enumerate(date_pairs):
     ifg, grid = focus_bound('products/Extracted/unwrappedPhase/' + date, lon_min, lat_min, lon_max, lat_max)
@@ -44,9 +49,8 @@ for i, date in enumerate(date_pairs):
     mask[mask <= 0] = np.nan
     ifg = ifg * mask
     # Get Dates
-    date1 = datetime.strptime(date.split('_')[0], '%Y%m%d').strftime('%Y_%m_%d')
-    date2 = datetime.strptime(date.split('_')[-1], '%Y%m%d').strftime('%Y_%m_%d')
-
+    date1, date2 = get_datetime(date)
+    # datetime1 =
     # Get Weather model from file
     wm1 = xr.load_dataset(" ".join(glob.glob('weather_model/weather_files/ERA-5_{date}*[A-Z].nc'.format(date=date1))))
     wm2 = xr.load_dataset(" ".join(glob.glob('weather_model/weather_files/ERA-5_{date}*[A-Z].nc'.format(date=date2))))
@@ -155,7 +159,8 @@ for i, date in enumerate(date_pairs):
                                            'format': 'GEO_TIFF',
                                            'region': geom})
             r = requests.get(data_url, allow_redirects=True)
-            local_fileName = os.path.join(os.getcwd()+'/GOES_data/', data_to_download + '_' + str(band) + '_' + str(dates[n]) + '.tif')
+            local_fileName = os.path.join(os.getcwd() + '/GOES_data/',
+                                          data_to_download + '_' + str(band) + '_' + str(dates[n]) + '.tif')
             open(local_fileName, 'wb').write(r.content)
     GOES_date_1 = glob.glob('GOES_data/GOES17_*_{}'.format(date1))
     GOES_date_2 = glob.glob('GOES_data/')
