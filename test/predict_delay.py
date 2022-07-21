@@ -1,17 +1,22 @@
+import pandas as pd
+import sys
+import os
+import tensorflow as tf
+
+current = os.path.dirname(os.path.realpath('extract_func'))
+parent = os.path.dirname(current)
+sys.path.append(parent)
 from extract_func.Extract_PTE_function import *
-from extract_func.Extract_ee_function import *
-# from tools.Extract_ee_function import *
-# from tools.Extract_PTE_function import *
 from joblib import load
 from datetime import datetime
 import requests
 
-service_account = 'goes-extract@extract-goes-1655507865824.iam.gserviceaccount.com'
-KEY = 'private_key.json'
-credentials = ee.ServiceAccountCredentials(service_account, KEY)
-print('Initialize Google Earth Engine...')
-ee.Initialize(credentials)
-print('Done')
+# service_account = 'goes-extract@extract-goes-1655507865824.iam.gserviceaccount.com'
+# KEY = 'private_key.json'
+# credentials = ee.ServiceAccountCredentials(service_account, KEY)
+# print('Initialize Google Earth Engine...')
+# ee.Initialize(credentials)
+# print('Done')
 
 date_pairs = ['20190714_20190702', '20190714_20190708', '20190720_20190714', '20190807_20190801',
               '20190819_20190813', '20190831_20190825', '20190906_20190831', '20190918_20190906']
@@ -33,9 +38,6 @@ scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
 scaler_y = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
 
 
-def interpolate_wm_time(date, time, ):
-    time = time.strptime
-
 
 for i, date in enumerate(date_pairs):
     ifg, grid = focus_bound('products/Extracted/unwrappedPhase/' + date, lon_min, lat_min, lon_max, lat_max)
@@ -48,12 +50,10 @@ for i, date in enumerate(date_pairs):
     mask[mask > 0] = 1
     mask[mask <= 0] = np.nan
     ifg = ifg * mask
-    # Get Dates
+    # Get date and wm
     date1, date2 = get_datetime(date)
-    # datetime1 =
-    # Get Weather model from file
-    wm1 = xr.load_dataset(" ".join(glob.glob('weather_model/weather_files/ERA-5_{date}*[A-Z].nc'.format(date=date1))))
-    wm2 = xr.load_dataset(" ".join(glob.glob('weather_model/weather_files/ERA-5_{date}*[A-Z].nc'.format(date=date2))))
+    wm1 = xr.load_dataset(" ".join(glob.glob('weather_model/weather_files/' + 'ERA-5_{date}*[A-Z].nc'.format(date=date1))))
+    wm2 = xr.load_dataset(" ".join(glob.glob('weather_model/weather_files/' + 'ERA-5_{date}*[A-Z].nc'.format(date=date2))))
 
     # Plot ifg
     plt.style.use('seaborn')
