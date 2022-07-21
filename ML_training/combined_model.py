@@ -105,6 +105,7 @@ model2 = create_mlp(dim.shape[1], [155, 80, 40, 20, 10, 5], regress=True)
 # Combined Model
 Combined = concatenate([model1.output, model2.output])
 out = Dense(2, activation='relu')(Combined)
+out = Dense(2, activation='relu')(out)
 out = Dense(1, activation='linear')(out)
 
 final_model = Model(inputs=[model1.input, model2.input], outputs=out, name='PTE_combined_model')
