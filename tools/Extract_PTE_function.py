@@ -27,6 +27,8 @@ from tensorflow.keras.layers import Dense, concatenate, Dropout
 from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
+from datetime import datetime
+from datetime import timedelta
 
 hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400
     , 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000
@@ -85,16 +87,60 @@ def get_datetime(date):
 
 # Get the closest up and floor hour of the acquisition of InSAR
 # date: date of the weather model needed e.g. 2019_01_12
-# time: time of the InSAR acquire e.g. T11:31:00
+# time: time of the InSAR acquire e.g. T11_31_00
 # time_for: the datetime format that is require
-def datetime_gen(date: str, time: str, time_for='%Y_%m_%dT%H_%M_%S'):
+# wmLoc: weather model directory e.g. 'weather_model/weather_files/'
+def getWM(date: str, time: str, wmLoc: str = '', time_for='%Y_%m_%d_T%H_%M_%S'):
     from datetime import datetime
     from datetime import timedelta
-    given_time = datetime.strptime(date + time, time_for)
-    minute = given_time.min
+    given_time = datetime.strptime(date + '_' + time, time_for)
+    minute = given_time.minute
     start_time = (given_time.replace(microsecond=0, second=0, minute=0)).strftime(time_for)
     end_time = (given_time.replace(microsecond=0, second=0, minute=0) + timedelta(hours=1)).strftime(time_for)
-    return start_time, end_time, minute
+    wm1 = xr.load_dataset(" ".join(glob.glob(wmLoc + 'ERA-5_{date}*[A-Z].nc'.format(date=start_time))))
+    wm2 = xr.load_dataset(" ".join(glob.glob(wmLoc + 'ERA-5_{date}*[A-Z].nc'.format(date=end_time))))
+    return wm1, wm2, minute
+
+
+def test_param(param: str):
+    if (param == 'All') or (param == 'all'):
+        print(param)
+        print('ALL')
+    elif param == 'p':
+        print(param)
+        print('P')
+    elif param == 't':
+        print(param)
+        print('T')
+    elif param == 'e':
+        print(param)
+        print('E')
+    else:
+        print(param)
+        print('No such param')
+
+
+def interpByTime(wm1, wm2, minute, param: str):
+    # Interp the z level to be the same.
+    update_wm1 = wm1.interp(z=hgtlvs)
+    update_wm2 = wm2.interp(z=hgtlvs)
+    if (param == 'all') or (param == 'all'):
+        dif_p = (update_wm1.p - update_wm2.p) * (minute / 60)
+        dif_t = (update_wm1.t - update_wm2.t) * (minute / 60)
+        dif_e = (update_wm1.e - update_wm2.e) * (minute / 60)
+        return update_wm1.p - dif_p, update_wm1.t - dif_t, update_wm1.e - dif_e
+    elif param == 'p':
+        dif = (update_wm1.p - update_wm2.p) * (minute / 60)
+        return update_wm1.p - dif
+    elif param == 't':
+        dif = (update_wm1.t - update_wm2.t) * (minute / 60)
+        return update_wm1.t - dif
+    elif param == 'e':
+        dif = (update_wm1.t - update_wm2.t) * (minute / 60)
+        return update_wm1.t - dif
+    else:
+        print('No param name: ', param, 'in weather model')
+        pass
 
 
 def using_mpl_scatter_density(fig, x, y):
