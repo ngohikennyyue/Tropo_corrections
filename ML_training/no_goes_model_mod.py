@@ -1,18 +1,21 @@
 import sys
 import os
+current = os.path.dirname(os.path.realpath('extract_func'))
+parent = os.path.dirname(current)
+sys.path.append(parent)
 from extract_func.Extract_PTE_function import *
 
-num_threads = 7
-os.environ["OMP_NUM_THREADS"] = "7"
-os.environ["TF_NUM_INTRAOP_THREADS"] = "7"
-os.environ["TF_NUM_INTEROP_THREADS"] = "7"
+num_threads = 10
+os.environ["OMP_NUM_THREADS"] = "10"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "10"
+os.environ["TF_NUM_INTEROP_THREADS"] = "10"
 
 tf.config.threading.set_inter_op_parallelism_threads(num_threads)
 tf.config.threading.set_intra_op_parallelism_threads(num_threads)
 tf.config.set_soft_device_placement(True)
 
 # Read in data
-GOES_dat = pd.read_csv('../GNSS_US/US/NewPTE_vert_fixed_hgtlvs.csv')
+GOES_dat = pd.read_csv('../../GNSS_US/US/NewPTE_vert_fixed_hgtlvs.csv')
 GOES_dat = GOES_dat.dropna()
 X = GOES_dat[GOES_dat.columns[pd.Series(GOES_dat.columns).str.startswith(('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))]]
 y = GOES_dat[['ZTD']]
@@ -29,10 +32,10 @@ y_train, scaler_y = standardized(y_train, 'MinMax')
 
 from joblib import dump, load
 
-dump(scaler_x, 'Scaler/US_WE_noGOES_MinMax_scaler_x.bin', compress=True)
-dump(scaler_y, 'Scaler/US_WE_noGOES_MinMax_scaler_y.bin', compress=True)
+dump(scaler_x, 'Scaler/US_noGOES_MinMax_scaler_x.bin', compress=True)
+dump(scaler_y, 'Scaler/US_noGOES_MinMax_scaler_y.bin', compress=True)
 
-# es = EarlyStopping(verbose=1,patience=10)
+es = EarlyStopping(verbose=1,patience=10)
 
 # Initialiizinig the ANN
 model = tf.keras.models.Sequential()
@@ -40,12 +43,22 @@ model = tf.keras.models.Sequential()
 model.add(tf.keras.layers.Input(shape=(155,)))
 # Adding first hidden layer
 model.add(tf.keras.layers.Dense(units=155, activation=PReLU(), kernel_initializer='he_uniform'))
+# Adding first hidden layer
+model.add(tf.keras.layers.Dense(units=155, activation=PReLU(), kernel_initializer='he_uniform'))
+# Adding hidden layer
+model.add(tf.keras.layers.Dense(units=80, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
 model.add(tf.keras.layers.Dense(units=80, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
 model.add(tf.keras.layers.Dense(units=40, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
+model.add(tf.keras.layers.Dense(units=40, activation=PReLU(), kernel_initializer='he_uniform'))
+# Adding hidden layer
 model.add(tf.keras.layers.Dense(units=20, activation=PReLU(), kernel_initializer='he_uniform'))
+# Adding hidden layer
+model.add(tf.keras.layers.Dense(units=20, activation=PReLU(), kernel_initializer='he_uniform'))
+# Adding hidden layer
+model.add(tf.keras.layers.Dense(units=10, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
 model.add(tf.keras.layers.Dense(units=10, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
@@ -56,7 +69,7 @@ model.add(tf.keras.layers.Dense(units=1, activation='linear', kernel_initializer
 model.compile(optimizer='adam', loss=['MSE'], metrics=['MAE'])
 
 # Train the ANN on the Training set
-model.fit(x_train, y_train, batch_size=1500, epochs=150, validation_split=0.2, verbose=0)
+model.fit(x_train, y_train, batch_size=1500, epochs=150, validation_split=0.2, callbacks=[es], verbose=0)
 
 # Plot history: MSE
 plt.plot(model.history.history['loss'], label='MSE (training data)')
@@ -65,7 +78,7 @@ plt.title('MSE for noise prediction')
 plt.ylabel('MSE value')
 plt.xlabel('No. epoch')
 plt.legend(loc="upper left")
-plt.savefig('Plots/Full_MSE_history_noGOES.png', dpi=300)
+plt.savefig('Plots/MSE_history_noGOES.png', dpi=300)
 plt.clf()
 
 # Plot history: MAE
@@ -75,10 +88,10 @@ plt.title('MAE for noise prediction')
 plt.ylabel('MAE value')
 plt.xlabel('No. epoch')
 plt.legend(loc="upper left")
-plt.savefig('Plots/Full_MAE_history_noGOES.png', dpi=300)
+plt.savefig('Plots/MAE_history_noGOES.png', dpi=300)
 
 # Saving model
-model.save('Model/Full_US_PTE_fixed_hgtlvs_model')
+model.save('Model/US_PTE_fixed_hgtlvs_model')
 
 # Predict different model
 predict = scaler_y.inverse_transform(model.predict(x_test))
@@ -110,7 +123,7 @@ ax.tick_params(axis='both', which='major', labelsize=10)
 plt.xlabel('Observed', fontsize=10)
 plt.ylabel('Predicted', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
-fig.savefig('Plots/Full_Ob_v_Pred_noGOES.png', dpi=300)
+fig.savefig('Plots/Ob_v_Pred_noGOES.png', dpi=300)
 
 # Plot of residual of the prediction
 fig = plt.figure()
@@ -122,6 +135,6 @@ ax.tick_params(axis='both', which='major', labelsize=10)
 plt.xlabel('True', fontsize=10)
 plt.ylabel('Residual', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
-fig.savefig('Plots/Full_Resid_true_noGOES.png', dpi=300)
+fig.savefig('Plots/Resid_true_noGOES.png', dpi=300)
 
 print('Finished Training')

@@ -149,6 +149,13 @@ def using_mpl_scatter_density(fig, x, y):
     fig.colorbar(density, label='Number of points per pixel')
 
 
+def get_rowcol(Raster, left, bottom, right, top, xs, ys):
+    with rasterio.open(Raster) as src:
+        window = from_bounds(left, bottom, right, top, src.transform)
+        rows, cols = rasterio.transform.rowcol(src.window_transform(window), xs, ys)
+    return rows, cols
+
+
 # Extract value from raster and their lat/lon grid of the bounding area
 def focus_bound(Raster, left, bottom, right, top):
     from rasterio.windows import Window

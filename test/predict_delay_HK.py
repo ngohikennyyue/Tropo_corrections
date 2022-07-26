@@ -28,6 +28,8 @@ Norm_model = tf.keras.models.load_model('../ML/Model/Full_US_PTE_fixed_hgtlvs_mo
 Multi_model = tf.keras.models.load_model('../ML/Multiple_Input_Model/Model'
                                          '/Test_New_model3_US_PTE_fixed_hgtlvs_cloud_model')
 wet_hydro_model = tf.keras.models.load_model('../ML/Wet_hydro_model/Model/Full_wet_hydro_US_PTE_fixed_hgtlvs_model')
+combined_mod_model = tf.keras.models.load_model(
+    '../ML/Combined_model/Model/combined_model_mod_US_PTE_fixed_hgtlvs_model')
 
 # Load scaler
 scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
@@ -51,6 +53,7 @@ predict1 = scaler_y.inverse_transform(Norm_model.predict(scaler_x.transform(X)))
 predict2 = scaler_y1.inverse_transform(
     Multi_model.predict([scalerP.transform(P), scalerT.transform(T), scalerE.transform(E)]))
 predict3 = wet_scaler_y.inverse_transform(wet_hydro_model.predict(wet_scaler_x.transform(wet)))
+predict4 = combined_mod_model.predict(np.hstack((predict1.reshape(-1, 1), predict2.reshape(-1, 1))))
 true1 = df[['ZTD']].values
 true2 = dat[['ZTD']].values
 
@@ -65,6 +68,10 @@ print('')
 print('Wet hydro model:')
 print('Predict: ', predict3[:5].ravel())
 print('True: ', true2[:5].ravel())
+print('')
+print('Combined model:')
+print('Predict: ', predict4[:5].ravel())
+print('True: ', true1[:5].ravel())
 print('')
 
 from sklearn.metrics import mean_squared_error, r2_score
@@ -103,6 +110,18 @@ print('R2: %.5f' % r2_score(true2, predict3))
 rmse = np.sqrt(mean_squared_error(true2, predict3))
 print('RMSE: %.5f' % rmse)
 errors = predict3 - true2
+print('Average error: %.5f' % np.mean(abs(errors)))
+print('')
+
+print("Combined model")
+# The mean squared error
+print('Mean squared error: %.10f' % mean_squared_error(true1, predict4))
+# The R2 score
+print('R2: %.5f' % r2_score(true1, predict4))
+# The RMSE
+rmse = np.sqrt(mean_squared_error(true1, predict4))
+print('RMSE: %.5f' % rmse)
+errors = predict4 - true1
 print('Average error: %.5f' % np.mean(abs(errors)))
 print('')
 
@@ -145,6 +164,19 @@ cbar.ax.tick_params(labelsize=10)
 fig.suptitle('Wet Hydro model obs vs pred')
 fig.savefig('Plots/HK/Full_wet_hydro_model_Ob_v_Pred.png', dpi=300)
 
+# Plot of Observation vs Prediction
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+density = ax.scatter_density(true1, predict4, cmap=white_viridis)
+cbar = fig.colorbar(density)
+cbar.set_label(label='Number of points per pixel', size=10)
+ax.tick_params(axis='both', which='major', labelsize=10)
+plt.xlabel('Observed', fontsize=10)
+plt.ylabel('Predicted', fontsize=10)
+cbar.ax.tick_params(labelsize=10)
+fig.suptitle('Combined model obs vs pred')
+fig.savefig('Plots/HK/Combined_model_Ob_v_Pred.png', dpi=300)
+
 # Plot of residual of the prediction
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
@@ -184,47 +216,60 @@ cbar.ax.tick_params(labelsize=10)
 fig.suptitle('Wet Hydro model Residual')
 fig.savefig('Plots/HK/Full_wet_hydro_model_Resid_true.png', dpi=300)
 
-print('')
-# G-matrix comparison
-G = np.stack((predict1.ravel(), predict2.ravel(), np.ones_like(predict1.ravel())), axis=1)
-print(G[:5, :])
-mhat, res, rank, s = np.linalg.lstsq(G, true1)
-print(mhat, res, rank, s)
-y_pred = np.dot(G, mhat)
-
-print("G-matrix")
-# The mean squared error
-print('Mean squared error: %.10f' % mean_squared_error(true1, y_pred))
-# The R2 score
-print('R2: %.5f' % r2_score(true1, y_pred))
-# The RMSE
-rmse = np.sqrt(mean_squared_error(true1, y_pred))
-print('RMSE: %.5f' % rmse)
-errors = y_pred - true1
-print('Average error: %.5f' % np.mean(abs(errors)))
-
 # Plot of residual of the prediction
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
-density = ax.scatter_density(true1, true1 - y_pred, cmap=white_viridis)
+density = ax.scatter_density(true1, true1 - predict4, cmap=white_viridis)
 cbar = fig.colorbar(density)
 cbar.set_label(label='Number of points per pixel', size=10)
 ax.tick_params(axis='both', which='major', labelsize=10)
 plt.xlabel('True', fontsize=10)
 plt.ylabel('Residual', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
-fig.suptitle('G-matrix Residual')
-fig.savefig('Plots/HK/G-matrix_Resid_true.png', dpi=300)
+fig.suptitle('Combined model Residual')
+fig.savefig('Plots/HK/Combined_model_Resid_true.png', dpi=300)
 
-# Plot of Observation vs Prediction
-fig = plt.figure()
-ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
-density = ax.scatter_density(true1, y_pred, cmap=white_viridis)
-cbar = fig.colorbar(density)
-cbar.set_label(label='Number of points per pixel', size=10)
-ax.tick_params(axis='both', which='major', labelsize=10)
-plt.xlabel('Observed', fontsize=10)
-plt.ylabel('Predicted', fontsize=10)
-cbar.ax.tick_params(labelsize=10)
-fig.suptitle('G-matrix obs vs pred')
-fig.savefig('Plots/HK/G-matrix_Ob_v_Pred.png', dpi=300)
+print('')
+# G-matrix comparison
+# G = np.stack((predict1.ravel(), predict2.ravel(), np.ones_like(predict1.ravel())), axis=1)
+# print(G[:5, :])
+# mhat, res, rank, s = np.linalg.lstsq(G, true1)
+# print(mhat, res, rank, s)
+# y_pred = np.dot(G, mhat)
+#
+# print("G-matrix")
+# # The mean squared error
+# print('Mean squared error: %.10f' % mean_squared_error(true1, y_pred))
+# # The R2 score
+# print('R2: %.5f' % r2_score(true1, y_pred))
+# # The RMSE
+# rmse = np.sqrt(mean_squared_error(true1, y_pred))
+# print('RMSE: %.5f' % rmse)
+# errors = y_pred - true1
+# print('Average error: %.5f' % np.mean(abs(errors)))
+#
+# # Plot of residual of the prediction
+# fig = plt.figure()
+# ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+# density = ax.scatter_density(true1, true1 - y_pred, cmap=white_viridis)
+# cbar = fig.colorbar(density)
+# cbar.set_label(label='Number of points per pixel', size=10)
+# ax.tick_params(axis='both', which='major', labelsize=10)
+# plt.xlabel('True', fontsize=10)
+# plt.ylabel('Residual', fontsize=10)
+# cbar.ax.tick_params(labelsize=10)
+# fig.suptitle('G-matrix Residual')
+# fig.savefig('Plots/HK/G-matrix_Resid_true.png', dpi=300)
+#
+# # Plot of Observation vs Prediction
+# fig = plt.figure()
+# ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+# density = ax.scatter_density(true1, y_pred, cmap=white_viridis)
+# cbar = fig.colorbar(density)
+# cbar.set_label(label='Number of points per pixel', size=10)
+# ax.tick_params(axis='both', which='major', labelsize=10)
+# plt.xlabel('Observed', fontsize=10)
+# plt.ylabel('Predicted', fontsize=10)
+# cbar.ax.tick_params(labelsize=10)
+# fig.suptitle('G-matrix obs vs pred')
+# fig.savefig('Plots/HK/G-matrix_Ob_v_Pred.png', dpi=300)
