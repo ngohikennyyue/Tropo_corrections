@@ -87,7 +87,7 @@ def addGeometry(min_lon, max_lon, min_lat, max_lat):
           [min_lon, min_lat],
           [max_lon, min_lat],
           [max_lon, max_lat]]])
-    return (geom)
+    return geom
 
 
 # add time margin for an input datetime
@@ -176,19 +176,19 @@ def sampFeat2array(img, points_list, bands):
 # time: str object of time of interested eg. '11:00:00'
 # geometry: AOI can be created with addGeometry function
 # bands: bands that are of interested in a list []
-def extract_param(file_path: str, time: str, bands: list):
+def extract_param(file_path: str, time: str, bands: list, GOES16=True):
     loc = os.path.dirname(os.path.abspath(file_path))
     name = file_path.split('/')[-1].split('.')[0]
     ext = file_path.split('/')[-1].split('.')[-1]
     print(loc, name, ext)
     if ext == 'csv':
         df = pd.read_csv(file_path)
-        df = df[df['Date'] > '2017-12-31']  # GOES data only valid after 20170710
-        df = df[(df['Lat'] > 26) & (df['Lat'] < 48) & (df['Lon'] > -124) & (df['Lon'] < -44)]
+        df = df[df['Date'] > '2017-07-10']  # GOES data only valid after 20170710
+        # df = df[(df['Lat'] > 26) & (df['Lat'] < 48) & (df['Lon'] > -124) & (df['Lon'] < -44)]
     elif ext == 'ftr':
         df = pd.read_feather(file_path)
         df = df[df['Date'] > '2017-07-10']  # GOES data only valid after 20170710
-        df = df[(df['Lat'] > 26) & (df['Lat'] < 48) & (df['Lon'] > -124) & (df['Lon'] < -44)]
+        # df = df[(df['Lat'] > 26) & (df['Lat'] < 48) & (df['Lon'] > -124) & (df['Lon'] < -44)]
     else:
         print('Can not read this file type', ext)
         exit()
@@ -199,8 +199,13 @@ def extract_param(file_path: str, time: str, bands: list):
         dd = df.loc[df['Date'] == i].copy()
         print(len(dd))
         station = dd[['Lon', 'Lat']].values
-        # get GOES 16 image
-        img = get_GOES16_image(i + 'T' + time)
+        if GOES16:
+            # get GOES 16 image
+            img = get_GOES16_image(i + 'T' + time)
+        else:
+            # get GOES 17 image
+            img = get_GOES17_image(i + 'T' + time)
+
         if isinstance(img.getInfo(), (float, int, str, list, dict, tuple)):  # skip any empty dataset
             # apply scale and offset image
             Img = applyScaleAndOffset_all(img)
