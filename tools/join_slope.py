@@ -5,13 +5,16 @@ import numpy as np
 def join_slope(file_path: str, slope_path: str):
     name = file_path.split('.')[0]
     df = pd.read_csv(file_path)
+    df = df.dropna()
     slope = pd.read_csv(slope_path)
     slope = slope.dropna()
     Date = np.sort(list(set(df['Date'])))
 
     for i, day in enumerate(Date):
         dd = df[df['Date'] == day]
-        result = dd.join(slope.set_index('ID')[['Slope']], on='ID')
+        result = pd.merge(dd, slope[['ID', 'Slope']], how='left', on='ID')
+        result = result.dropna()
+        print(day, len(result))
         if i == 0:
             result.to_csv(name + '_slope.csv', index=False)
         else:

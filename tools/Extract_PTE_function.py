@@ -36,6 +36,60 @@ hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200,
     , 14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
 
 
+# Show the metrics
+# true: the actual (Target) compare to the predicting values
+# predict: the ML predicted result
+def print_metric(true, predict, name: str):
+    from sklearn.metrics import mean_squared_error, r2_score
+    print('')
+    print(name)
+    # The mean squared error
+    print('Mean squared error: %.10f' % mean_squared_error(true, predict))
+    # The R2 score
+    print('R2: %.5f' % r2_score(true, predict))
+    # The RMSE
+    rmse = np.sqrt(mean_squared_error(true, predict))
+    print('RMSE: %.5f' % rmse)
+    errors = predict - true
+    print('Average error: %.5f' % np.mean(abs(errors)))
+    print('')
+
+
+# Plot the obs v. predict and residual plot
+# true: the actual (Target) compare to the predicting values
+# predict: the ML predicted result
+# model: the name of the model
+# save_loc: the plots will be save at
+def plot_graphs(true, predict, model: str, save_loc: str):
+    # Plot of Observation vs Prediction
+    print('Loc: ', save_loc)
+    print('Model: ', model)
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(true, predict, cmap=white_viridis)
+    cbar = fig.colorbar(density)
+    cbar.set_label(label='Number of points per pixel', size=10)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    plt.xlabel('Observed', fontsize=10)
+    plt.ylabel('Predicted', fontsize=10)
+    cbar.ax.tick_params(labelsize=10)
+    fig.suptitle(model + ' obs vs pred')
+    fig.savefig(save_loc + '/' + model + '_Ob_v_Pred.png', dpi=300)
+
+    # Plot of residual of the prediction
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(true, true - predict, cmap=white_viridis)
+    cbar = fig.colorbar(density)
+    cbar.set_label(label='Number of points per pixel', size=10)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    plt.xlabel('True', fontsize=10)
+    plt.ylabel('Residual', fontsize=10)
+    cbar.ax.tick_params(labelsize=10)
+    fig.suptitle(model + ' Residual')
+    fig.savefig(save_loc + '/' + model + '_Resid_true.png', dpi=300)
+
+
 def plot_result(true, predict):
     plt.hist(true - predict)
     plt.xlabel('Residual (m)')

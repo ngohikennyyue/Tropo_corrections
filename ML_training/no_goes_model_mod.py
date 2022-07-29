@@ -5,10 +5,10 @@ parent = os.path.dirname(current)
 sys.path.append(parent)
 from extract_func.Extract_PTE_function import *
 
-num_threads = 10
-os.environ["OMP_NUM_THREADS"] = "10"
-os.environ["TF_NUM_INTRAOP_THREADS"] = "10"
-os.environ["TF_NUM_INTEROP_THREADS"] = "10"
+num_threads = 20
+os.environ["OMP_NUM_THREADS"] = "20"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "20"
+os.environ["TF_NUM_INTEROP_THREADS"] = "20"
 
 tf.config.threading.set_inter_op_parallelism_threads(num_threads)
 tf.config.threading.set_intra_op_parallelism_threads(num_threads)
