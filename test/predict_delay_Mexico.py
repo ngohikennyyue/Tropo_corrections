@@ -39,6 +39,7 @@ new_Norm_model = tf.keras.models.load_model('../ML/No_GOES_model/Model/US_PTE_fi
 inter_model = tf.keras.models.load_model('../ML/Inter_model/Model/inter_PTE_fixed_hgtlvs_model')
 slope_model = tf.keras.models.load_model('../ML/Slope_model/Model/PTE_fixed_hgtlvs_slope_model')
 GOES_model = tf.keras.models.load_model('../ML/GOES_model/Model/PTE_fixed_hgtlvs_GOES_model')
+GOES_DOY_model = tf.keras.models.load_model('../ML/GOES_model/Model/PTE_fixed_hgtlvs_GOES_DOY_model')
 
 # Load scaler
 scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
@@ -57,9 +58,12 @@ slope_scaler_x = load('../ML/Slope_model/Scaler/Slope_MinMax_scaler_x.bin')
 slope_scaler_y = load('../ML/Slope_model/Scaler/Slope_MinMax_scaler_y.bin')
 GOES_scaler_x = load('../ML/GOES_model/Scaler/GOES_MinMax_scaler_x.bin')
 GOES_scaler_y = load('../ML/GOES_model/Scaler/GOES_MinMax_scaler_y.bin')
+GOES_DOY_scaler_x = load('../ML/GOES_model/Scaler/GOES_DOY_MinMax_scaler_x.bin')
+GOES_DOY_scaler_y = load('../ML/GOES_model/Scaler/GOES_DOY_MinMax_scaler_y.bin')
 
 # Obtain the input variables
 X = df[df.columns[pd.Series(df.columns).str.startswith(('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))]]
+DOY_X = cloud[cloud.columns[pd.Series(cloud.columns).str.startswith(('DOY', 'Lat', 'Hgt_m', 'P_', 'T_', 'e_', 'CMI_C'))]]
 P = df[df.columns[pd.Series(df.columns).str.startswith(('Lat', 'Hgt_m', 'P_'))]]
 T = df[df.columns[pd.Series(df.columns).str.startswith(('Lat', 'Hgt_m', 'T_'))]]
 E = df[df.columns[pd.Series(df.columns).str.startswith(('Lat', 'Hgt_m', 'e_'))]]
@@ -80,6 +84,7 @@ predict5 = Nscaler_y.inverse_transform(new_Norm_model.predict(Nscaler_x.transfor
 predict6 = inter_scaler_y.inverse_transform(inter_model.predict(inter_scaler_x.transform(int_X)))
 predict7 = slope_scaler_y.inverse_transform(slope_model.predict(slope_scaler_x.transform(slopeX)))
 predict8 = GOES_scaler_y.inverse_transform(GOES_model.predict(GOES_scaler_x.transform(cloudX)))
+predict9 = GOES_DOY_scaler_y.inverse_transform(GOES_DOY_model.predict(GOES_DOY_scaler_x.transform(DOY_X)))
 
 true1 = df[['ZTD']].values
 true2 = dat[['ZTD']].values
@@ -128,6 +133,11 @@ print('Predict: ', predict8[:5].ravel())
 print('True: ', true5[:5].ravel())
 print('Diff: ', true5[:5].ravel() - predict8[:5].ravel())
 print('')
+print('GOES DOY model:')
+print('Predict: ', predict9[:5].ravel())
+print('True: ', true5[:5].ravel())
+print('Diff: ', true5[:5].ravel() - predict9[:5].ravel())
+print('')
 
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -139,6 +149,7 @@ print_metric(true1, predict5, 'New Normal model')
 print_metric(true3, predict6, 'Interferometric model')
 print_metric(true4, predict7, 'Slope model')
 print_metric(true5, predict8, 'GOES model')
+print_metric(true5, predict9, 'GOES DOY model')
 
 print('Make plots')
 plot_graphs(true1, predict1, 'Normal model', 'Plots/Mexico')
@@ -149,6 +160,7 @@ plot_graphs(true1, predict5, 'New Normal model', 'Plots/Mexico')
 plot_graphs(true3, predict6, 'Interferometric model', 'Plots/Mexico')
 plot_graphs(true4, predict7, 'Slope model', 'Plots/Mexico')
 plot_graphs(true5, predict8, 'GOES model', 'Plots/Mexico')
+plot_graphs(true5, predict9, 'GOES DOY model', 'Plots/Mexico')
 
 # # G-matrix comparison
 # G = np.stack((predict1.ravel(), predict2.ravel(), np.ones_like(predict1.ravel())), axis=1)

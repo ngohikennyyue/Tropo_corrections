@@ -36,6 +36,18 @@ hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200,
     , 14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
 
 
+# Adding DOY next to the column 'Date'
+# df_path: file path of the data frame that needed to add DOY
+def addDOY(df_path: str):
+    df = pd.read_csv(df_path)
+    date = df['Date'].values
+    date_date = [datetime.strptime(day, '%Y-%m-%d') for day in date]
+    DOY = [date.timetuple().tm_yday for date in date_date]
+    df.insert(loc=2, column='DOY', value=DOY)
+    df.to_csv(df_path, index=False)
+    print('Finished')
+
+
 # Show the metrics
 # true: the actual (Target) compare to the predicting values
 # predict: the ML predicted result
