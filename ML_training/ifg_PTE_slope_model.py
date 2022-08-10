@@ -16,11 +16,11 @@ tf.config.threading.set_intra_op_parallelism_threads(num_threads)
 tf.config.set_soft_device_placement(True)
 
 # Read in data
-GOES_dat = pd.read_csv('../../GNSS_US/US/NewPTE_vert_fixed_hgtlvs.csv')
-GOES_dat = GOES_dat.dropna()
-GOES_dat = GOES_dat[GOES_dat['sigZTD'] < 0.01]
-X = GOES_dat[GOES_dat.columns[pd.Series(GOES_dat.columns).str.startswith(('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))]]
-y = GOES_dat[['ZTD']]
+dat = pd.read_csv('../../InSAR/Hawaii/Hawaii_ifg_PTE_fixed_hgtlvs.csv')
+dat = dat.dropna()
+
+X = dat[dat.columns[pd.Series(dat.columns).str.startswith(('Lat', 'Hgt_m', 'date1_', 'date2_', 'slope'))]]
+y = dat[['ifg']]
 
 print(X.head())
 
@@ -34,44 +34,44 @@ y_train, scaler_y = standardized(y_train, 'MinMax')
 
 from joblib import dump, load
 
-dump(scaler_x, 'Scaler/US_noGOES_MinMax_scaler_x.bin', compress=True)
-dump(scaler_y, 'Scaler/US_noGOES_MinMax_scaler_y.bin', compress=True)
+dump(scaler_x, 'Scaler/ifg_PTE_slope_MinMax_scaler_x.bin', compress=True)
+dump(scaler_y, 'Scaler/ifg_PTE_slope_MinMax_scaler_y.bin', compress=True)
 
-es = EarlyStopping(verbose=1, patience=10)
+es = EarlyStopping(verbose=1, patience=15)
 
 # Initialiizinig the ANN
 model = tf.keras.models.Sequential()
 # Input layer
-model.add(tf.keras.layers.Input(shape=(155,)))
+model.add(tf.keras.layers.Input(shape=(309,)))
 # Adding first hidden layer
-model.add(tf.keras.layers.Dense(units=155, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=309, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding first hidden layer
-model.add(tf.keras.layers.Dense(units=155, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=309, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=80, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=150, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=80, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=150, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=40, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=75, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=40, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=75, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=20, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=35, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=20, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=35, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=10, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=15, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=10, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=15, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
 model.add(tf.keras.layers.Dense(units=5, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding the output layer
 model.add(tf.keras.layers.Dense(units=1, activation='linear', kernel_initializer='he_uniform'))
-# Compilling the ANN
+# Compiling the ANN
 model.compile(optimizer='adam', loss=['MSE'], metrics=['MAE'])
 
 # Train the ANN on the Training set
-model.fit(x_train, y_train, batch_size=15000, epochs=150, validation_split=0.2, callbacks=[es], verbose=0)
+model.fit(x_train, y_train, batch_size=1500, epochs=200, validation_split=0.2, callbacks=[es], verbose=0)
 
 # Plot history: MSE
 plt.plot(model.history.history['loss'], label='MSE (training data)')
@@ -80,7 +80,7 @@ plt.title('MSE for noise prediction')
 plt.ylabel('MSE value')
 plt.xlabel('No. epoch')
 plt.legend(loc="upper left")
-plt.savefig('Plots/MSE_history_noGOES.png', dpi=300)
+plt.savefig('Plots/ifg_PTE_slope_MSE_history.png', dpi=300)
 plt.clf()
 
 # Plot history: MAE
@@ -90,10 +90,10 @@ plt.title('MAE for noise prediction')
 plt.ylabel('MAE value')
 plt.xlabel('No. epoch')
 plt.legend(loc="upper left")
-plt.savefig('Plots/MAE_history_noGOES.png', dpi=300)
+plt.savefig('Plots/ifg_PTE_slope_MAE_history.png', dpi=300)
 
 # Saving model
-model.save('Model/US_PTE_fixed_hgtlvs_model')
+model.save('Model/ifg_PTE_slope_model')
 
 # Predict different model
 predict = scaler_y.inverse_transform(model.predict(x_test))
@@ -125,7 +125,7 @@ ax.tick_params(axis='both', which='major', labelsize=10)
 plt.xlabel('Observed', fontsize=10)
 plt.ylabel('Predicted', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
-fig.savefig('Plots/Ob_v_Pred_noGOES.png', dpi=300)
+fig.savefig('Plots/ifg_PTE_slope_Ob_v_Pred.png', dpi=300)
 
 # Plot of residual of the prediction
 fig = plt.figure()
@@ -137,6 +137,6 @@ ax.tick_params(axis='both', which='major', labelsize=10)
 plt.xlabel('True', fontsize=10)
 plt.ylabel('Residual', fontsize=10)
 cbar.ax.tick_params(labelsize=10)
-fig.savefig('Plots/Resid_true_noGOES.png', dpi=300)
+fig.savefig('Plots/ifg_PTE_slope_Resid_true.png', dpi=300)
 
 print('Finished Training')

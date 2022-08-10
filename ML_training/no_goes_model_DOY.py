@@ -1,5 +1,6 @@
 import sys
 import os
+
 current = os.path.dirname(os.path.realpath('extract_func'))
 parent = os.path.dirname(current)
 sys.path.append(parent)
@@ -18,6 +19,7 @@ tf.config.set_soft_device_placement(True)
 # Read in data
 GOES_dat = pd.read_csv('../../GNSS_US/US/PTE_vert_fixed_hgtlvs.csv')
 GOES_dat = GOES_dat.dropna()
+GOES_dat = GOES_dat[GOES_dat['sigZTD'] < 0.01]
 X = GOES_dat[GOES_dat.columns[pd.Series(GOES_dat.columns).str.startswith(('DOY', 'Lat', 'Hgt_m', 'P_', 'T_', 'e_'))]]
 y = GOES_dat[['ZTD']]
 
@@ -60,7 +62,7 @@ model.add(tf.keras.layers.Dense(units=1, activation='linear', kernel_initializer
 model.compile(optimizer='adam', loss=['MSE'], metrics=['MAE'])
 
 # Train the ANN on the Training set
-model.fit(x_train, y_train, batch_size=150, epochs=150, validation_split=0.2, verbose=0)
+model.fit(x_train, y_train, batch_size=15000, epochs=150, validation_split=0.2, verbose=0)
 plot_model(model, 'Plots/noGOES_DOY_model.png', show_shapes=True)
 
 # Plot history: MSE

@@ -40,6 +40,7 @@ inter_model = tf.keras.models.load_model('../ML/Inter_model/Model/inter_PTE_fixe
 slope_model = tf.keras.models.load_model('../ML/Slope_model/Model/PTE_fixed_hgtlvs_slope_model')
 GOES_model = tf.keras.models.load_model('../ML/GOES_model/Model/PTE_fixed_hgtlvs_GOES_model')
 GOES_DOY_model = tf.keras.models.load_model('../ML/GOES_model/Model/PTE_fixed_hgtlvs_GOES_DOY_model')
+slope_DOY_model = tf.keras.models.load_model('../ML/Slope_model/Model/PTE_fixed_hgtlvs_slope_DOY_model')
 
 # Load scaler
 scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
@@ -60,6 +61,8 @@ GOES_scaler_x = load('../ML/GOES_model/Scaler/GOES_MinMax_scaler_x.bin')
 GOES_scaler_y = load('../ML/GOES_model/Scaler/GOES_MinMax_scaler_y.bin')
 GOES_DOY_scaler_x = load('../ML/GOES_model/Scaler/GOES_DOY_MinMax_scaler_x.bin')
 GOES_DOY_scaler_y = load('../ML/GOES_model/Scaler/GOES_DOY_MinMax_scaler_y.bin')
+slope_DOY_scaler_x = load('../ML/Slope_model/Scaler/Slope_DOY_MinMax_scaler_x.bin')
+slope_DOY_scaler_y = load('../ML/Slope_model/Scaler/Slope_DOY_MinMax_scaler_y.bin')
 
 # Obtain the input variables
 X = df[df.columns[pd.Series(df.columns).str.startswith(('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))]]
@@ -71,6 +74,7 @@ wet = dat[dat.columns[pd.Series(dat.columns).str.startswith(('Lat', 'Hgt_m', 'to
 int_X = int_dat[int_dat.columns[pd.Series(int_dat.columns).str.startswith(('Lat', 'Hgt_m', 'P_', 'T_', 'e_'))]]
 slopeX = slope[slope.columns[pd.Series(slope.columns).str.startswith(('Lat', 'Hgt_m', 'P_', 'T_', 'e_', 'Slope'))]]
 cloudX = cloud[cloud.columns[pd.Series(cloud.columns).str.startswith(('Lat', 'Hgt_m', 'P_', 'T_', 'e_', 'CMI_C'))]]
+slopeDOY_x = slope[slope.columns[pd.Series(slope.columns).str.startswith(('DOY','Lat', 'Hgt_m', 'P_', 'T_', 'e_', 'Slope'))]]
 
 print('length of wet data:', len(wet))
 print('length of others: ',  len(X))
@@ -85,6 +89,7 @@ predict6 = inter_scaler_y.inverse_transform(inter_model.predict(inter_scaler_x.t
 predict7 = slope_scaler_y.inverse_transform(slope_model.predict(slope_scaler_x.transform(slopeX)))
 predict8 = GOES_scaler_y.inverse_transform(GOES_model.predict(GOES_scaler_x.transform(cloudX)))
 predict9 = GOES_DOY_scaler_y.inverse_transform(GOES_DOY_model.predict(GOES_DOY_scaler_x.transform(DOY_X)))
+predict10 = slope_DOY_scaler_y.inverse_transform(slope_DOY_model.predict(slope_DOY_scaler_x.transform(slopeDOY_x)))
 
 true1 = df[['ZTD']].values
 true2 = dat[['ZTD']].values
@@ -138,6 +143,11 @@ print('Predict: ', predict9[:5].ravel())
 print('True: ', true5[:5].ravel())
 print('Diff: ', true5[:5].ravel() - predict9[:5].ravel())
 print('')
+print('Slope DOY model:')
+print('Predict: ', predict10[:5].ravel())
+print('True: ', true4[:5].ravel())
+print('Diff: ', true4[:5].ravel() - predict10[:5].ravel())
+print('')
 
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -150,6 +160,7 @@ print_metric(true3, predict6, 'Interferometric model')
 print_metric(true4, predict7, 'Slope model')
 print_metric(true5, predict8, 'GOES model')
 print_metric(true5, predict9, 'GOES DOY model')
+print_metric(true4, predict10, 'Slope DOY model')
 
 print('Make plots')
 plot_graphs(true1, predict1, 'Normal model', 'Plots/Mexico')
@@ -161,6 +172,7 @@ plot_graphs(true3, predict6, 'Interferometric model', 'Plots/Mexico')
 plot_graphs(true4, predict7, 'Slope model', 'Plots/Mexico')
 plot_graphs(true5, predict8, 'GOES model', 'Plots/Mexico')
 plot_graphs(true5, predict9, 'GOES DOY model', 'Plots/Mexico')
+plot_graphs(true4, predict10, 'Slope DOY model', 'Plots/Mexico')
 
 # # G-matrix comparison
 # G = np.stack((predict1.ravel(), predict2.ravel(), np.ones_like(predict1.ravel())), axis=1)

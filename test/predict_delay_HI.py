@@ -30,12 +30,14 @@ hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200,
 # Load Model
 # GOES_model = tf.keras.models.load_model('../../ML/Model/Full_US_WE_PTE_fixed_hgtlvs_cloud_model')
 Norm_model = tf.keras.models.load_model('../ML/Model/Full_US_PTE_fixed_hgtlvs_model')
-
+inter_model = tf.keras.models.load_model('../ML/Inter_model/Model/inter_PTE_fixed_hgtlvs_model')
 # Load scaler
 # scaler_x_g = load('../../ML/Scaler/US_WE_MinMax_scaler_x.bin')
 # scaler_y_g = load('../../ML/Scaler/US_WE_MinMax_scaler_y.bin')
 scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
 scaler_y = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
+inter_scaler_x = load('../ML/Inter_model/Scaler/interferometric_MinMax_scaler_x.bin')
+inter_scaler_y = load('../ML/Inter_model/Scaler/interferometric_MinMax_scaler_y.bin')
 
 for i, date in enumerate(date_pairs):
 
@@ -89,19 +91,25 @@ for i, date in enumerate(date_pairs):
     T2 = wm2.t.interp(x=x, y=y, z=hgtlvs).values
     e2 = wm2.e.interp(x=x, y=y, z=hgtlvs).values
 
-    Day_1 = np.hstack((dem_grid[:, 1].reshape(-1, 1), dem.ravel().reshape(-1, 1), np.vstack(P1.transpose().reshape((P1.shape[-1] * P1.shape[1], 51))),
+    Day_1 = np.hstack((dem_grid[:, 1].reshape(-1, 1), dem.ravel().reshape(-1, 1),
+                       np.vstack(P1.transpose().reshape((P1.shape[-1] * P1.shape[1], 51))),
                        np.vstack(T1.transpose().reshape((T1.shape[-1] * T1.shape[1], 51))),
                        np.vstack(e1.transpose().reshape((e1.shape[-1] * e1.shape[1], 51)))))
-    Day_2 = np.hstack((dem_grid[:, 1].reshape(-1, 1), dem.ravel().reshape(-1, 1), np.vstack(P2.transpose().reshape((P2.shape[-1] * P2.shape[1], 51))),
+    Day_2 = np.hstack((dem_grid[:, 1].reshape(-1, 1), dem.ravel().reshape(-1, 1),
+                       np.vstack(P2.transpose().reshape((P2.shape[-1] * P2.shape[1], 51))),
                        np.vstack(T2.transpose().reshape((T2.shape[-1] * T2.shape[1], 51))),
                        np.vstack(e2.transpose().reshape((e2.shape[-1] * e2.shape[1], 51)))))
+    inf_wm = np.hstack((dem_grid[:, 1].reshape(-1, 1), dem.ravel().reshape(-1, 1),
+                        np.vstack((P1-P2).transpose().reshape((P2.shape[-1] * P2.shape[1], 51))),
+                        np.vstack((T1-T2).transpose().reshape((T2.shape[-1] * T2.shape[1], 51))),
+                        np.vstack((e1-e2).transpose().reshape((e2.shape[-1] * e2.shape[1], 51)))))
 
     # Norm_model_prediction
     pred_1 = scaler_y.inverse_transform(Norm_model.predict(scaler_x.transform(Day_1)))
     pred_2 = scaler_y.inverse_transform(Norm_model.predict(scaler_x.transform(Day_2)))
+    pred_inf = inter_scaler_y.inverse_transform(inter_model.predict(inter_scaler_x.transform(inf_wm)))
 
     # Plot TD prediction of each date
-    print('TD prediction...')
     plt.style.use('seaborn')
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 15))
     im1 = ax1.imshow(pred_1.reshape(dem.shape), cmap='RdYlBu')
@@ -114,7 +122,6 @@ for i, date in enumerate(date_pairs):
     plt.clf()
 
     TD = (pred_2 - pred_1).reshape(dem.shape)  # The difference of two dates will become the total delay
-    print('Total delay difference of two date')
     plt.style.use('seaborn')
     plt.imshow(TD, cmap='RdYlBu')
     plt.colorbar(label='Prediction Total Delay(m)')
@@ -122,10 +129,18 @@ for i, date in enumerate(date_pairs):
     plt.savefig('Plots/Hawaii/Norm/Total_Delay_{}.png'.format(date), dpi=300)
     plt.clf()
 
+    inf_td = pred_inf.reshape(dem.shape)
+    plt.style.use('seaborn')
+    plt.imshow(inf_td, cmap='RdYlBu')
+    plt.colorbar(label='Prediction Total Delay(m)')
+    plt.title('Interferic model Total Delay ({})'.format(date))
+    plt.savefig('Plots/Hawaii/Norm/Int_Total_Delay_{}.png'.format(date), dpi=300)
+    plt.clf()
+
     # Plot Ifg along side with TD (predicted)
     ifg_img = convert_rad(ifg - np.nanmean(ifg), 5.6 / 100)
     plt.style.use('seaborn')
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 15))
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(2, 2, figsize=(15, 15))
     im1 = ax1.imshow(TD - np.nanmean(TD), cmap='RdYlBu',)
     plt.colorbar(im1, ax=ax1, fraction=0.05, pad=0.1, label='(m)')
     ax1.set_title('Total Delay of Date {}'.format(date))
@@ -137,6 +152,10 @@ for i, date in enumerate(date_pairs):
                      cmap='RdYlBu')
     plt.colorbar(im3, ax=ax3, fraction=0.05, pad=0.1, label='(m)')
     ax3.set_title('Tropo Corrected Ifg {}'.format(date))
+    im4 = ax4.imshow(inf_td,extent=[grid[:, 0].min(), grid[:, 0].max(), grid[:, -1].min(), grid[:, -1].max()],
+                     cmap='RdYlBu' )
+    plt.colorbar(im4, ax=ax4, fraction=0.05, pad=0.1, label='(m)')
+    ax4.set_title('Inter model total delay - {}'.format(date))
     fig.savefig('Plots/Hawaii/Norm/Norm_model_Ifg_PredTD_{}.png'.format(date), dpi=300)
     plt.clf()
 

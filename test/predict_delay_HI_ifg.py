@@ -26,12 +26,16 @@ hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200,
 # Load Model
 # GOES_model = tf.keras.models.load_model('../../ML/Model/Full_US_WE_PTE_fixed_hgtlvs_cloud_model')
 Norm_model = tf.keras.models.load_model('../ML/Model/Full_US_PTE_fixed_hgtlvs_model')
+inter_model = tf.keras.models.load_model('../ML/Inter_model/Model/inter_PTE_fixed_hgtlvs_model')
 
 # Load scaler
 # scaler_x_g = load('../../ML/Scaler/US_WE_MinMax_scaler_x.bin')
 # scaler_y_g = load('../../ML/Scaler/US_WE_MinMax_scaler_y.bin')
 scaler_x = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_x.bin')
 scaler_y = load('../ML/Scaler/US_WE_noGOES_MinMax_scaler_y.bin')
+inter_scaler_x = load('../ML/Inter_model/Scaler/interferometric_MinMax_scaler_x.bin')
+inter_scaler_y = load('../ML/Inter_model/Scaler/interferometric_MinMax_scaler_y.bin')
+
 GPS = pd.read_csv('../InSAR/Hawaii/GPS_station/product/UNRcombinedGPS_ztd.csv')
 GPS = GPS[GPS['sigZTD'] < 0.01]
 
@@ -124,10 +128,15 @@ for i, date in enumerate(date_pairs):
                        np.vstack(P2.transpose().reshape((P2.shape[-1] * P2.shape[1], 51))),
                        np.vstack(T2.transpose().reshape((T2.shape[-1] * T2.shape[1], 51))),
                        np.vstack(e2.transpose().reshape((e2.shape[-1] * e2.shape[1], 51)))))
+    inf_wm = np.hstack((dem_grid[:, 1].reshape(-1, 1), dem.ravel().reshape(-1, 1),
+                        np.vstack((P1 - P2).transpose().reshape((P2.shape[-1] * P2.shape[1], 51))),
+                        np.vstack((T1 - T2).transpose().reshape((T2.shape[-1] * T2.shape[1], 51))),
+                        np.vstack((e1 - e2).transpose().reshape((e2.shape[-1] * e2.shape[1], 51)))))
 
     # Norm_model_prediction
     pred_1 = scaler_y.inverse_transform(Norm_model.predict(scaler_x.transform(Day_1)))
     pred_2 = scaler_y.inverse_transform(Norm_model.predict(scaler_x.transform(Day_2)))
+    pred_inf = inter_scaler_y.inverse_transform(inter_model.predict(inter_scaler_x.transform(inf_wm)))
 
     # Plot TD prediction of each date
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 10))
@@ -145,6 +154,14 @@ for i, date in enumerate(date_pairs):
     fig.suptitle('TD prediction and GPS stations')
     fig.savefig('Plots/Hawaii/Ifg_GPS/TD_predict_cGPS_{}.png'.format(date), dpi=300)
     fig.clf()
+
+    inf_td = pred_inf.reshape(dem.shape)
+    plt.style.use('seaborn')
+    plt.imshow(inf_td, cmap='RdYlBu')
+    plt.colorbar(label='Prediction Total Delay(m)')
+    plt.title('Interferic model Total Delay ({})'.format(date))
+    plt.savefig('Plots/Hawaii/Ifg_GPS/Int_Total_Delay_{}.png'.format(date), dpi=300)
+    plt.clf()
 
     print('')
     print('Predict TD in two dates compare with GPS - ', date)
@@ -181,8 +198,8 @@ for i, date in enumerate(date_pairs):
     print('Predicted ZTD compare with GPS ZTD - ', date)
     comb_ztd = pd.DataFrame(
         np.hstack((df1.ID.values.reshape(-1, 1), TD[rows, cols].reshape(-1, 1), GPS_TD.reshape(-1, 1),
-                   (GPS_TD - TD[rows, cols]).reshape(-1, 1))))
-    comb_ztd.columns = ['GPS_ID', 'Pred_TD', 'GPS_TD', 'Diff GPS - TD']
+                   inf_td[rows, cols].reshape(-1, 1), (GPS_TD - TD[rows, cols]).reshape(-1, 1))))
+    comb_ztd.columns = ['GPS_ID', 'Pred_TD', 'GPS_TD', 'Inf_TD', 'Diff GPS - TD']
     print(comb_ztd)
     print('')
     # Plot Ifg along side with TD (predicted)
@@ -190,17 +207,17 @@ for i, date in enumerate(date_pairs):
     norm_TD = TD - np.nanmean(TD)
     S_norm_TD = norm_TD / np.cos(np.radians(los))
     S_GPS_TD = GPS_TD / np.cos(np.radians(los[rows, cols]))
-
-    OK = OrdinaryKriging(xs.reshape(-1, 1),
-                         ys.reshape(-1, 1),
-                         S_GPS_TD.reshape(-1, 1),
-                         variogram_model='linear',
-                         verbose=False,
-                         enable_plotting=False,
-                         coordinates_type='geographic')
-    XX = np.linspace(xs.min(), xs.max(), 100)
-    YY = np.linspace(ys.min(), ys.max(), 100)
-    z, ss = OK.execute('grid', XX, YY)
+    S_inf_td = inf_td / np.cos(np.radians(los))
+    # OK = OrdinaryKriging(xs.reshape(-1, 1),
+    #                      ys.reshape(-1, 1),
+    #                      S_GPS_TD.reshape(-1, 1),
+    #                      variogram_model='linear',
+    #                      verbose=False,
+    #                      enable_plotting=False,
+    #                      coordinates_type='geographic')
+    # XX = np.linspace(xs.min(), xs.max(), 100)
+    # YY = np.linspace(ys.min(), ys.max(), 100)
+    # z, ss = OK.execute('grid', XX, YY)
 
     fig, (ax1, ax2) = plt.subplots(2, 2, figsize=(10, 10))
     fig.tight_layout(pad=5)
@@ -215,19 +232,25 @@ for i, date in enumerate(date_pairs):
                           vmax=np.nanmax(ifg_img))
     plt.colorbar(sct2, ax=ax1[1], fraction=0.05, pad=0.02, label='(m)')
     ax1[1].set_title('Raw Interferogram {}'.format(date))
-    im3 = ax2[0].imshow(z, cmap='RdYlBu', extent=[xs.min(), xs.max(), ys.min(), ys.max()])
-    sct3 = ax2[0].scatter(xs, ys, c=S_GPS_TD, cmap='RdYlBu', edgecolors='k', vmin=np.nanmin(z), vmax=np.nanmax(z))
+    im3 = ax2[0].imshow(S_inf_td, cmap='RdYlBu', extent=[grid[:, 0].min(), grid[:, 0].max(), grid[:, -1].min(), grid[:, -1].max()])
+    sct3 = ax2[0].scatter(xs, ys, c=S_GPS_TD, cmap='RdYlBu', edgecolors='k', vmin=np.nanmin(S_inf_td),
+                          vmax=np.nanmax(S_inf_td))
     plt.colorbar(sct3, ax=ax2[0], fraction=0.05, pad=0.02, label='(m)')
-    ax2[0].set_title('Kriging delay from GPS station')
+    ax2[0].set_title('Interferic total delay')
+    im4 = ax2[1].imshow(ifg_img + S_inf_td, cmap='RdYlBu',
+                        extent=[grid[:, 0].min(), grid[:, 0].max(), grid[:, -1].min(), grid[:, -1].max()])
+    plt.colorbar(im4, ax=ax2[1], fraction=0.05, pad=0.02, label='(m)')
+    ax2[1].set_title('Ifg cleared')
     fig.suptitle('Predicted TD, GPS TD, and Ifg in STD {}'.format(date))
     fig.savefig('Plots/Hawaii/Ifg_GPS/Ifg_Pred_GPS_TD_{}.png'.format(date), dpi=300)
     fig.clf()
     print('')
     print('Predicted TD, GPS TD , and Ifg in STD - ', date)
     comp_std = pd.DataFrame(np.hstack((df1.ID.values.reshape(-1, 1), (norm_TD / np.cos(los))[rows, cols].reshape(-1, 1),
-                                       ifg_img[rows, cols].reshape(-1, 1), S_GPS_TD.reshape(-1, 1),
-                                       (ifg_img[rows, cols] - S_GPS_TD).reshape(-1, 1))))
-    comp_std.columns = ['GPS_ID', 'ML_pred', 'IFG', 'GPS_station', 'Diff GPS-IFG']
+                                       S_inf_td[rows, cols].reshape(-1,1), ifg_img[rows, cols].reshape(-1, 1),
+                                       S_GPS_TD.reshape(-1, 1), (ifg_img[rows, cols] - S_GPS_TD).reshape(-1, 1),
+                                       (S_inf_td[rows, cols] - S_GPS_TD).reshape(-1, 1))))
+    comp_std.columns = ['GPS_ID', 'ML_pred', 'Inf_td', 'IFG', 'GPS_station', 'Diff GPS-IFG', 'Diff GPS-inf_td']
 
     print(comp_std)
     print('')
