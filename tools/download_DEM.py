@@ -39,7 +39,7 @@ slope = rd.TerrainAttribute(_dem, attrib='slope_riserun')
 
 print(slope[:10])
 profile = dataset.profile
-profile['nodata'] = -9999.
+profile['nodata'] = np.nan
 profile['dtype'] = slope.dtype
 
 # Save derived slope

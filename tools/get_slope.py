@@ -1,23 +1,30 @@
-import os
-import numpy as np
-import glob
 import rasterio
+import richdem as rd
+import numpy as np
 import matplotlib.pyplot as plt
-import math
-import pandas as pd
 
-slope = '../../DEM/slope.tif'
-GPS_station = pd.read_csv('GPS_stations/product2/gnssStationList_overbbox.csv')
-xs = GPS_station['Lon'].values
-ys = GPS_station['Lat'].values
+def get_slope(dem_path: str):
+    # Read in dem.tif for calculating slope
+    dataset = rasterio.open(dem_path)
+    data = dataset.read(1)
+    data[data==dataset.nodata] = np.nan
+    _dem = rd.rdarray(data, no_data=dataset.nodata)
+    slope = rd.TerrainAttribute(_dem, attrib='slope_riserun')
 
-with rasterio.open(slope) as src:
-    rows, cols = rasterio.transform.rowcol(src.transform, xs, ys)
-    slope_val = src.read(1)
-    slope_val[slope_val<0.0] = np.nan
-    dats = slope_val[rows, cols]
-    GPS_station['Slope'] = dats.reshape(-1,1)
+    print(slope[:10])
+    profile = dataset.profile
+    profile['nodata'] = np.nan
+    profile['dtype'] = slope.dtype
 
-GPS_station.to_csv('GPS_ztd_slope.csv', index=False)
+    # Save derived slope
+    with rasterio.open('slope.tif', 'w', **profile) as dst:
+        dst.write(slope, 1)
 
-print('Finished')
+    # Plot slope
+    plt.imshow(slope, cmap='Reds')
+    plt.colorbar()
+    plt.savefig('slope.png')
+
+    print('Finished slope')
+
+get_slope('Extracted/DEM/SRTM_3arcsec_uncropped.tif')

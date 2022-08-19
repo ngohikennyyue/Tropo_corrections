@@ -23,7 +23,7 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
 from tensorflow.keras.losses import Huber
-from tensorflow.keras.layers import Dense, concatenate, Dropout
+from tensorflow.keras.layers import Dense, concatenate, Dropout, BatchNormalization
 from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
@@ -87,6 +87,7 @@ def plot_graphs(true, predict, model: str, save_loc: str):
     cbar.ax.tick_params(labelsize=10)
     fig.suptitle(model + ' obs vs pred')
     fig.savefig(save_loc + '/' + model + '_Ob_v_Pred.png', dpi=300)
+    plt.clf()
 
     # Plot of residual of the prediction
     fig = plt.figure()
@@ -100,6 +101,7 @@ def plot_graphs(true, predict, model: str, save_loc: str):
     cbar.ax.tick_params(labelsize=10)
     fig.suptitle(model + ' Residual')
     fig.savefig(save_loc + '/' + model + '_Resid_true.png', dpi=300)
+    plt.clf()
 
 
 def plot_result(true, predict):
