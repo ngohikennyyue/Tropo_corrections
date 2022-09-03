@@ -21,11 +21,14 @@ tf.config.set_soft_device_placement(True)
 # Read in data
 dat = pd.read_feather('../../InSAR/Large_scale/ML_data/train_data.ftr')
 dat = dat.dropna()
+GNSS = pd.read_feather('../../GNSS_US/US/US_Inter_PTE_vert_fixed_hgtlvs.ftr')
+GNSS = GNSS.dropna()
 test_dat = pd.read_feather('../../InSAR/Large_scale/ML_data/test_data.ftr')
 test_dat = test_dat.dropna()
-
+GNSS_X = GNSS[GNSS.columns[pd.Series(GNSS.columns).str.startswith(('Lat', 'Hgt_m', 'date1_', 'date2_', 'slope'))]]
+GNSS_y = GNSS[['ZTD']].values
 X = dat[dat.columns[pd.Series(dat.columns).str.startswith(('Lat', 'Hgt_m', 'date1_', 'date2_', 'slope'))]]
-y = dat[['ifg']]
+y = dat[['ifg']].values
 X, y = shuffle(X, y)
 print(X.head())
 test_X = test_dat[test_dat.columns[pd.Series(test_dat.columns).str.startswith(('Lat', 'Hgt_m', 'date1_', 'date2_',
@@ -43,7 +46,7 @@ x_test = pca.transform(x_test)
 y, scaler_y = standardized(y, 'MinMax')
 y_test = test_y
 print('Variance of each component:', pca.explained_variance_ratio_)
-print('\n Total Variance Explained:', round(sum(list(pca.explained_variance_ratio_))*100, 2))
+print('\n Total Variance Explained:', round(sum(list(pca.explained_variance_ratio_)) * 100, 2))
 
 from joblib import dump
 
@@ -108,3 +111,8 @@ print_metric(true_train, predict_train, 'ifg_PTE_slope_full_small_PCA_model_trai
 plot_graphs(true_train, predict_train, 'ifg_PTE_slope_full_small_PCA_model_train', 'Plots/Small_batch_32')
 
 print('Finished Training')
+
+fig, axes = plt.subplots(15, 10, figsize=(30, 20))
+for i, ax in enumerate(axes.flat):
+    ax.scatter(date1.ifg, date1.iloc[:, i + 1], alpha=0.5)
+

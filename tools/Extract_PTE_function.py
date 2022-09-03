@@ -30,10 +30,10 @@ from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
 from datetime import datetime
 from datetime import timedelta
 
-hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400
+hgtlvs = [0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400
     , 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000
     , 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000, 11000, 12000, 13000
-    , 14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
+    , 14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000, 45000]
 
 
 # Adding DOY next to the column 'Date'
@@ -193,19 +193,19 @@ def interpByTime(wm1, wm2, minute, param: str):
     update_wm1 = wm1.interp(z=hgtlvs)
     update_wm2 = wm2.interp(z=hgtlvs)
     if (param == 'all') or (param == 'all'):
-        dif_p = (update_wm1.p - update_wm2.p) * (minute / 60)
-        dif_t = (update_wm1.t - update_wm2.t) * (minute / 60)
-        dif_e = (update_wm1.e - update_wm2.e) * (minute / 60)
-        return update_wm1.p - dif_p, update_wm1.t - dif_t, update_wm1.e - dif_e
+        dif_p = (update_wm2.p - update_wm1.p) * (minute / 60)
+        dif_t = (update_wm2.t - update_wm1.t) * (minute / 60)
+        dif_e = (update_wm2.e - update_wm1.e) * (minute / 60)
+        return update_wm1.p + dif_p, update_wm1.t + dif_t, update_wm1.e + dif_e
     elif param == 'p':
-        dif = (update_wm1.p - update_wm2.p) * (minute / 60)
-        return update_wm1.p - dif
+        dif = (update_wm2.p - update_wm1.p) * (minute / 60)
+        return update_wm1.p + dif
     elif param == 't':
-        dif = (update_wm1.t - update_wm2.t) * (minute / 60)
-        return update_wm1.t - dif
+        dif = (update_wm2.t - update_wm1.t) * (minute / 60)
+        return update_wm1.t + dif
     elif param == 'e':
-        dif = (update_wm1.t - update_wm2.t) * (minute / 60)
-        return update_wm1.t - dif
+        dif = (update_wm2.t - update_wm1.t) * (minute / 60)
+        return update_wm1.t + dif
     else:
         print('No param name: ', param, 'in weather model')
         pass
@@ -338,7 +338,7 @@ def process_PTE_data(train, test, variable):
 
 # Create the sequential model with specific nodes and dimensions.
 # dim: input dimensions
-# nodes: a list of node in each layer e.g. [256, 128,64, 32]
+# nodes: a list of node in each layer e.g. [256, 128, 64, 32]
 # regress: return the last node as the output in linear
 def create_mlp(dim, nodes, regress=False):
     model = Sequential()
