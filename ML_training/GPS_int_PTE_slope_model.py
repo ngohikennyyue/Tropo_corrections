@@ -32,31 +32,32 @@ test_y = test[['int_ZTD']]
 
 from sklearn.model_selection import train_test_split
 
-# x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=40)
+train_x, valid_x, train_y, valid_y = train_test_split(train_x, train_y, test_size=0.2, random_state=40)
 
 train_x, scaler_x = standardized(train_x, 'MinMax')
 test_x = scaler_x.transform(test_x)
+valid_x = scaler_x.transform(valid_x)
 train_y, scaler_y = standardized(train_y, 'MinMax')
-y_test = scaler_y.transform(test_y)
+valid_y = scaler_y.transform(valid_y)
 from joblib import dump
 
 dump(scaler_x, 'Scaler/GPS_int_PTE_slope_model_MinMax_scaler_x.bin', compress=True)
 dump(scaler_y, 'Scaler/GPS_int_PTE_slope_model_MinMax_scaler_y.bin', compress=True)
 
-es = EarlyStopping(verbose=1, patience=8)
+es = EarlyStopping(verbose=1, patience=10)
 
 # Initialiizinig the ANN
 model = tf.keras.models.Sequential()
 # Input layer
-model.add(tf.keras.layers.Input(shape=(304,)))
+model.add(tf.keras.layers.Input(shape=(305,)))
 # Adding first hidden layer
-model.add(tf.keras.layers.Dense(units=150, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=154, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding first hidden layer
-model.add(tf.keras.layers.Dense(units=70, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=154, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=30, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=54, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding hidden layer
-model.add(tf.keras.layers.Dense(units=15, activation=PReLU(), kernel_initializer='he_uniform'))
+model.add(tf.keras.layers.Dense(units=54, activation=PReLU(), kernel_initializer='he_uniform'))
 # Adding the output layer
 model.add(tf.keras.layers.Dense(units=1, activation='linear'))
 # Compiling the ANN
@@ -64,7 +65,7 @@ model.compile(optimizer='adam', loss=['MSE'], metrics=['MAE'])
 # Print model summary
 print(model.summary())
 # Train the ANN on the Training set
-model.fit(train_x, train_y, batch_size=6000, epochs=200, validation_data=[test_x, y_test], callbacks=[es], verbose=0)
+model.fit(train_x, train_y, batch_size=512, epochs=200, validation_data=[valid_x, valid_y], callbacks=[es], verbose=0)
 
 # Plot history: MSE
 plt.plot(model.history.history['loss'], label='MSE (training data)')
@@ -89,11 +90,14 @@ plt.savefig('Plots/GPS_int_PTE_slope_model_MAE_history.png', dpi=300)
 model.save('Model/GPS_int_PTE_slope_model')
 
 # Predict different model
+predict_true = scaler_y.inverse_transform(model.predict(train_x))
 predict = scaler_y.inverse_transform(model.predict(test_x))
 # predict = model.predict(x_test)
 true = test_y.values
+true_true = scaler_y.inverse_transform(train_y)
 
-print_metric(true, predict, 'GPS_int_PTE_slope_model')
-plot_graphs(true, predict, 'GPS_int_PTE_slope_model', 'Plots')
-
+print_metric(true, predict, 'Test_GPS_int_PTE_slope_model')
+plot_graphs(true, predict, 'Test_GPS_int_PTE_slope_model', 'Plots')
+print_metric(true_true, predict_true, 'True_GPS_int_PTE_slope_model')
+plot_graphs(true_true, predict_true, 'True_GPS_int_PTE_slope_model', 'Plots')
 print('Finished Training')

@@ -18,12 +18,11 @@ dat = dat.dropna()
 test_dat = pd.read_csv('../../../InSAR/Large_scale/Hawaii/Hawaii_test_ref_ifg_PTE_fixed_hgtlvs.csv')
 test_dat = test_dat.dropna()
 
-X = dat[dat.columns[pd.Series(dat.columns).str.startswith(('Lat', 'Hgt_m', 'date1_', 'date2_', 'slope'))]]
+X = dat.iloc[:, dat.columns.str.startswith(('Lon', 'Lat', 'Hgt_m', 'date1_', 'date2_', 'slope'))]
 y = dat[['ifg']]
 # X, y = shuffle(X, y)
 print(X.head())
-x_test = test_dat[test_dat.columns[pd.Series(test_dat.columns).str.startswith(('Lat', 'Hgt_m', 'date1_', 'date2_',
-                                                                               'slope'))]]
+x_test = test_dat.iloc[:, test_dat.columns.str.startswith(('Lon', 'Lat', 'Hgt_m', 'date1_', 'date2_', 'slope'))]
 y_test = test_dat[['ifg']]
 
 
@@ -32,7 +31,7 @@ from joblib import load
 scaler_x = load('Scaler/ifg_Hawaii_ref_model_MinMax_scaler_x.bin')
 scaler_y = load('Scaler/ifg_Hawaii_ref_model_MinMax_scaler_y.bin')
 
-batchsize = [64, 128, 256, 512]
+batchsize = [512]
 for batch in batchsize:
     # Load model
     model = tf.keras.models.load_model('Model/ifg_Hawaii_ref_model_batchsize_{}'.format(batch))
@@ -44,8 +43,69 @@ for batch in batchsize:
     true_test = y_test.values
 
     print_metric(true_true, predict_true, 'True_ifg_Hawaii_ref_model_batchsize_{}'.format(batch))
-    plot_graphs(true_true, predict_true, 'True_ifg_Hawaii_ref_model_batchsize_{}'.format(batch), 'Plots/ref_model')
-    print_metric(true_test, predict_test, 'Test_ifg_Hawaii_ref_model_batchsize_{}'.format(batch))
-    plot_graphs(true_test, predict_test, 'Test_ifg_Hawaii_ref_model_batchsize_{}'.format(batch), 'Plots/ref_model')
 
+    model = 'True_ifg_Hawaii_ref_model_batchsize_{}'.format(batch)
+    save_loc = 'Plots/Train_Test_valid'
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(true_true, predict_true, cmap=white_viridis)
+    cbar = fig.colorbar(density)
+    cbar.set_label(label='Number of points per pixel', size=10)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    plt.xlabel('Observed', fontsize=10)
+    plt.ylabel('Predicted', fontsize=10)
+    plt.xlim([-.1, .1])
+    plt.ylim([-.1, .1])
+    plt.plot([-.1, .1], [-.1, .1], 'k-')
+    cbar.ax.tick_params(labelsize=10)
+    fig.suptitle(model + ' obs vs pred')
+    fig.savefig(save_loc + '/' + model + '_Ob_v_Pred.png', dpi=300)
+    plt.clf()
+
+    # Plot of residual of the prediction
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(true_true, true_true - predict_true, cmap=white_viridis)
+    cbar = fig.colorbar(density)
+    cbar.set_label(label='Number of points per pixel', size=10)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    plt.xlabel('True', fontsize=10)
+    plt.ylabel('Residual', fontsize=10)
+    cbar.ax.tick_params(labelsize=10)
+    fig.suptitle(model + ' Residual')
+    fig.savefig(save_loc + '/' + model + '_Resid_true.png', dpi=300)
+    plt.clf()
+
+    print_metric(true_test, predict_test, 'Test_ifg_Hawaii_ref_model_batchsize_{}'.format(batch))
+    model = 'Test_ifg_Hawaii_ref_model_batchsize_{}'.format(batch)
+    save_loc = 'Plots/Train_Test_valid'
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(true_test, predict_test, cmap=white_viridis)
+    cbar = fig.colorbar(density)
+    cbar.set_label(label='Number of points per pixel', size=10)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    plt.xlabel('Observed', fontsize=10)
+    plt.ylabel('Predicted', fontsize=10)
+    plt.xlim([-.1, .1])
+    plt.ylim([-.1, .1])
+    plt.plot([-.1, .1], [-.1, .1], 'k-')
+    cbar.ax.tick_params(labelsize=10)
+    fig.suptitle(model + ' obs vs pred')
+    fig.savefig(save_loc + '/' + model + '_Ob_v_Pred.png', dpi=300)
+    plt.clf()
+
+    # Plot of residual of the prediction
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(true_test, true_test - predict_test, cmap=white_viridis)
+    cbar = fig.colorbar(density)
+    cbar.set_label(label='Number of points per pixel', size=10)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    plt.xlabel('True', fontsize=10)
+    plt.ylabel('Residual', fontsize=10)
+    cbar.ax.tick_params(labelsize=10)
+    fig.suptitle(model + ' Residual')
+    fig.savefig(save_loc + '/' + model + '_Resid_true.png', dpi=300)
+    plt.clf()
 print('Finished Training')

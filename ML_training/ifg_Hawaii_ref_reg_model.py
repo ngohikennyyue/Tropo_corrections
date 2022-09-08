@@ -2,7 +2,6 @@ import sys
 import os
 
 import pandas as pd
-
 current = os.path.dirname(os.path.realpath('extract_func'))
 parent = os.path.dirname(current)
 parent = os.path.dirname(parent)
@@ -46,8 +45,8 @@ y_valid = scaler_y.transform(y_valid)
 
 from joblib import dump
 
-dump(scaler_x, 'Scaler/ifg_Hawaii_ref_model_MinMax_scaler_x.bin', compress=True)
-dump(scaler_y, 'Scaler/ifg_Hawaii_ref_model_MinMax_scaler_y.bin', compress=True)
+dump(scaler_x, 'Scaler/ifg_Hawaii_ref_reg_model_MinMax_scaler_x.bin', compress=True)
+dump(scaler_y, 'Scaler/ifg_Hawaii_ref_reg_model_MinMax_scaler_y.bin', compress=True)
 
 batchsize = [512, 256, 128, 64]
 for batch in batchsize:
@@ -57,13 +56,13 @@ for batch in batchsize:
     # Input layer
     model.add(tf.keras.layers.Input(shape=(310,)))
     # Adding first hidden layer
-    model.add(tf.keras.layers.Dense(units=106, activation=PReLU()))
+    model.add(tf.keras.layers.Dense(units=106, activation=PReLU(), kernel_regularizer=tf.keras.regularizers.l1(0.01)))
     # Adding hidden layer
-    model.add(tf.keras.layers.Dense(units=106, activation=PReLU()))
+    model.add(tf.keras.layers.Dense(units=106, activation=PReLU(), kernel_regularizer=tf.keras.regularizers.l1(0.01)))
     # Adding hidden layer
-    model.add(tf.keras.layers.Dense(units=55, activation=PReLU()))
+    model.add(tf.keras.layers.Dense(units=55, activation=PReLU(), kernel_regularizer=tf.keras.regularizers.l1(0.01)))
     # Adding hidden layer
-    model.add(tf.keras.layers.Dense(units=55, activation=PReLU()))
+    model.add(tf.keras.layers.Dense(units=55, activation=PReLU(), kernel_regularizer=tf.keras.regularizers.l1(0.01)))
     # Adding the output layer
     model.add(tf.keras.layers.Dense(units=1, activation=PReLU()))
     # Compiling the ANN
@@ -81,7 +80,7 @@ for batch in batchsize:
     plt.ylabel('MSE value')
     plt.xlabel('No. epoch')
     plt.legend(loc="upper left")
-    plt.savefig('Plots/ref_model/ifg_Hawaii_ref_model_batchsize_{}_MSE_history.png'.format(batch), dpi=300)
+    plt.savefig('Plots/reg_model/ifg_Hawaii_ref_model_batchsize_{}_MSE_history.png'.format(batch), dpi=300)
     plt.clf()
 
     # Plot history: MAE
@@ -91,10 +90,10 @@ for batch in batchsize:
     plt.ylabel('MAE value')
     plt.xlabel('No. epoch')
     plt.legend(loc="upper left")
-    plt.savefig('Plots/ref_model/ifg_Hawaii_ref_model_batchsize_{}_MAE_history.png'.format(batch), dpi=300)
+    plt.savefig('Plots/reg_model/ifg_Hawaii_ref_model_batchsize_{}_MAE_history.png'.format(batch), dpi=300)
 
     # Saving model
-    model.save('Model/ifg_Hawaii_ref_model_batchsize_{}'.format(batch))
+    model.save('Model/ifg_Hawaii_ref_reg_model_batchsize_{}'.format(batch))
 
     # Predict different model
     predict_true = scaler_y.inverse_transform(model.predict(x_train))
@@ -103,10 +102,10 @@ for batch in batchsize:
     true_test = y_test.values
     true_true = scaler_y.inverse_transform(y_train)
 
-    print_metric(true_true, predict_true, 'True_ifg_Hawaii_ref_model_batchsize_{}'.format(batch))
+    print_metric(true_true, predict_true, 'True_ifg_Hawaii_ref_reg_model_batchsize_{}'.format(batch))
 
-    model = 'True_ifg_Hawaii_ref_model_batchsize_{}'.format(batch)
-    save_loc = 'Plots/ref_model'
+    model = 'True_ifg_Hawaii_ref_reg_model_batchsize_{}'.format(batch)
+    save_loc = 'Plots/reg_model'
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
     density = ax.scatter_density(true_true, predict_true, cmap=white_viridis)
@@ -137,9 +136,9 @@ for batch in batchsize:
     fig.savefig(save_loc + '/' + model + '_Resid_true.png', dpi=300)
     plt.clf()
 
-    print_metric(true_test, predict_test, 'Test_ifg_Hawaii_ref_model_batchsize_{}'.format(batch))
-    model = 'Test_ifg_Hawaii_ref_model_batchsize_{}'.format(batch)
-    save_loc = 'Plots/ref_model'
+    print_metric(true_test, predict_test, 'Test_ifg_Hawaii_ref_reg_model_batchsize_{}'.format(batch))
+    model = 'Test_ifg_Hawaii_ref_reg_model_batchsize_{}'.format(batch)
+    save_loc = 'Plots/reg_model'
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
     density = ax.scatter_density(true_test, predict_test, cmap=white_viridis)

@@ -239,7 +239,7 @@ def focus_bound(Raster, left, bottom, right, top):
     return w, grid
 
 
-# Function that create an interpretor with an assigned parameter
+# Function that create an interpreter with an assigned parameter
 def make_interpretor(ds, para: str):
     x = ds.x.values
     y = ds.y.values
