@@ -10,6 +10,7 @@ from datetime import datetime
 from datetime import timedelta
 from extract_func.Extract_PTE_function import *
 
+
 # add time margin for an input datetime
 def datetime_offset(date_time, time_for='%Y-%m-%dT%H:%M:%S', margin=5):
     time = date_time
@@ -20,8 +21,12 @@ def datetime_offset(date_time, time_for='%Y-%m-%dT%H:%M:%S', margin=5):
 
 
 def extract_inter_param(df, slope_path: str, workLoc='', wm_file_path: str = '', date_diff=12, from_scratch=False,
-                        variables=('P_', 'T_', 'e_')):
+                        int_f=False, variables=('P_', 'T_', 'e_')):
     file_name = os.getcwd().split('/')[-1]
+    if int_f:
+        file_name = file_name + '_param_inf'
+    else:
+        pass
     Date = np.sort(list(set(df['Date'])))
     GOES = 'GOES_'
     res = GOES in variables
@@ -64,14 +69,16 @@ def extract_inter_param(df, slope_path: str, workLoc='', wm_file_path: str = '',
                     y = xr.DataArray(df_start['Lat'].ravel(), dims='y')
                     z = xr.DataArray(hgtlvs, dims='z')
 
-                    P1 = pd.DataFrame(ds1.p.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                    T1 = pd.DataFrame(ds1.t.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                    e1 = pd.DataFrame(ds1.e.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                    P2 = pd.DataFrame(ds2.p.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                    T2 = pd.DataFrame(ds2.t.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                    e2 = pd.DataFrame(ds2.e.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-
-                    inter_PTE = pd.concat([P1, T1, e1, P2, T2, e2], axis=1, ignore_index=True).values
+                    P1 = ds1.p.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    T1 = ds1.t.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    e1 = ds1.e.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    P2 = ds2.p.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    T2 = ds2.t.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    e2 = ds2.e.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    if not int_f:
+                        inter_PTE = np.hstack((P1, T1, e1, P2, T2, e2))
+                    else:
+                        inter_PTE = np.hstack((P1 - P2, T1 - T2, e1 - e2))
                 else:
                     print('At this moment we are not able to extract GOES data. It is still work in progress')
                     break
@@ -93,13 +100,20 @@ def extract_inter_param(df, slope_path: str, workLoc='', wm_file_path: str = '',
                        ['date2_e_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
                        ['GOES_' + str(i) for i in range(1, 5)]
             else:
-                name = ['ID', 'start_date', 'end_date', 'int_ZTD', 'Lon', 'Lat', 'Hgt_m'] + \
-                       ['date1_P_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
-                       ['date1_T_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
-                       ['date1_e_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
-                       ['date2_P_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
-                       ['date2_T_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
-                       ['date2_e_' + str(i) for i in range(1, len(hgtlvs) + 1)]
+                if not int_f:
+                    name = ['ID', 'start_date', 'end_date', 'int_ZTD', 'Lon', 'Lat', 'Hgt_m'] + \
+                           ['date1_P_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
+                           ['date1_T_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
+                           ['date1_e_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
+                           ['date2_P_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
+                           ['date2_T_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
+                           ['date2_e_' + str(i) for i in range(1, len(hgtlvs) + 1)]
+                else:
+                    name = ['ID', 'start_date', 'end_date', 'int_ZTD', 'Lon', 'Lat', 'Hgt_m'] + \
+                           ['P_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
+                           ['T_' + str(i) for i in range(1, len(hgtlvs) + 1)] + \
+                           ['e_' + str(i) for i in range(1, len(hgtlvs) + 1)]
+
             dat.columns = name
             dat = pd.merge(dat, slope_ex[['ID', 'Slope']], how='left', on='ID')
             if i == 0:
