@@ -192,24 +192,29 @@ def interpByTime(wm1, wm2, minute, param: str):
     # Interp the z level to be the same.
     update_wm1 = wm1.interp(z=hgtlvs)
     update_wm2 = wm2.interp(z=hgtlvs)
-    if (param == 'all') or (param == 'all'):
-        dif_p = (update_wm2.p - update_wm1.p) * (minute / 60)
-        dif_t = (update_wm2.t - update_wm1.t) * (minute / 60)
-        dif_e = (update_wm2.e - update_wm1.e) * (minute / 60)
-        return update_wm1.p + dif_p, update_wm1.t + dif_t, update_wm1.e + dif_e
+    if (param == 'all') or (param == 'ALL'):
+        dif_p = (update_wm1.p - update_wm2.p) * (minute / 60)
+        dif_t = (update_wm1.t - update_wm2.t) * (minute / 60)
+        dif_e = (update_wm1.e - update_wm2.e) * (minute / 60)
+        return update_wm1.p - dif_p, update_wm1.t - dif_t, update_wm1.e - dif_e
     elif param == 'p':
-        dif = (update_wm2.p - update_wm1.p) * (minute / 60)
-        return update_wm1.p + dif
+        dif = (update_wm1.p - update_wm2.p) * (minute / 60)
+        return update_wm1.p - dif
     elif param == 't':
-        dif = (update_wm2.t - update_wm1.t) * (minute / 60)
-        return update_wm1.t + dif
+        dif = (update_wm1.t - update_wm2.t) * (minute / 60)
+        return update_wm1.t - dif
     elif param == 'e':
-        dif = (update_wm2.t - update_wm1.t) * (minute / 60)
-        return update_wm1.t + dif
+        dif = (update_wm1.t - update_wm2.t) * (minute / 60)
+        return update_wm1.t - dif
+    elif param == 'wet_total':
+        dif = (update_wm1.wet_total - update_wm2.wet_total) * (minute / 60)
+        return update_wm1.wet_total - dif
+    elif param == 'hydro_total':
+        dif = (update_wm1.hydro_total - update_wm2.hydro_total) * (minute / 60)
+        return update_wm1.hydro_total - dif
     else:
         print('No param name: ', param, 'in weather model')
         pass
-
 
 def using_mpl_scatter_density(fig, x, y):
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
@@ -239,12 +244,15 @@ def focus_bound(Raster, left, bottom, right, top):
     return w, grid
 
 
-# Function that create an interpreter with an assigned parameter
-def make_interpretor(ds, para: str):
+# Function that create an interpretor with an assigned parameter
+def make_interpretor(ds, para=None):
     x = ds.x.values
     y = ds.y.values
     z = ds.z.values
-    data = ds.variables[para].transpose('x', 'y', 'z')
+    if not para:
+        data = ds.transpose('x', 'y', 'z')
+    else:
+        data = ds.variables[para].transpose('x', 'y', 'z')
     interpolator = rgi(points=(x, y, z), values=data.values, method='linear', bounds_error=False)
     return interpolator
 
