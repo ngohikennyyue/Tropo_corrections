@@ -30,11 +30,10 @@ from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
 from datetime import datetime
 from datetime import timedelta
 
-hgtlvs = [0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400
-    , 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000
-    , 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000, 11000, 12000, 13000
-    , 14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000, 45000]
-
+hgtlvs = [ -100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400
+          ,2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000
+          ,5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000, 11000, 12000, 13000
+          ,14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
 
 # Adding DOY next to the column 'Date'
 # df_path: file path of the data frame that needed to add DOY
@@ -240,7 +239,7 @@ def focus_bound(Raster, left, bottom, right, top):
         X = [i * aff[0] + aff[2] for i in range(w.shape[1])]
         Y = [i * aff[4] + aff[5] for i in range(w.shape[0])]
         X, Y = np.meshgrid(X, Y)
-        grid = np.stack([X.ravel(), Y.ravel()], axis=-1)
+        grid = np.stack([X.ravel(), Y.ravel()], axis=-1) # [Lon, Lat]
     return w, grid
 
 
@@ -265,16 +264,15 @@ from rasterio.enums import Resampling
 
 def Resamp_rasterio(fn: str, left, bottom, right, top, ref):
     with rasterio.open(fn) as src:
-        r_width, r_height = ref.shape
+        r_height, r_width = ref.shape
         window = from_bounds(left, bottom, right, top, src.transform)
         data = src.read(out_shape=(
             src.count,
-            int(r_width),
-            int(r_height)),
-            resampling=Resampling.cubic, window=window)
-        aff = src.window_transform(window=window)
-        X = [i * aff[0] + aff[2] for i in range(r_width)]
-        Y = [i * aff[4] + aff[5] for i in range(r_height)]
+            int(r_height),
+            int(r_width)),
+            resampling=Resampling.nearest, window=window)
+        X = np.linspace(left, right, r_width)
+        Y = np.linspace(top, bottom, r_height)
         X, Y = np.meshgrid(X, Y)
         grid = np.stack([X.ravel(), Y.ravel()], axis=-1)
         return data[0], grid
@@ -382,8 +380,20 @@ def get_index(dist, shape, k):
 # file path: have to be the file where all the weather model are saved
 # df : The list of combined data from downloading GNSS data using RAiDER Package
 # Vertical: would like to interpolate everything from vertically from the lat lon
+def extract_param_GNSS(df, wm_file_path: str, workLoc: str = '', vertical=False, fixed_hgt=False, batchsize=5000):
+    def PTE_interp(wm, loc, df):
+        # Create interpretor for each param
+        P_interp = make_interpretor(wm, 'p')
+        T_interp = make_interpretor(wm, 't')
+        e_interp = make_interpretor(wm, 'e')
 
-def extract_param_GNSS(df, wm_file_path: str, workLoc: str = '', vertical=False, fixed_hgt=False):
+        # Interp the param
+        df['P'] = (P_interp(loc)).values
+        df['T'] = (T_interp(loc)).values
+        df['e'] = (e_interp(loc)).values
+
+        return df
+
     Date = np.sort(list(set(df['Date'])))
     for num, i in enumerate(Date):
         print(i)
@@ -411,17 +421,20 @@ def extract_param_GNSS(df, wm_file_path: str, workLoc: str = '', vertical=False,
             print('Done', i)
 
         else:
-            if fixed_hgt:
+            if fixed_hgt: 
+                wm_param = []
+                for iter in range(0, len(dd), batchsize):
                 # Get coordinate of the GPS station
-                x = xr.DataArray(dd['Lon'].ravel(), dims='x')
-                y = xr.DataArray(dd['Lat'].ravel(), dims='y')
-                z = xr.DataArray(hgtlvs, dims='z')
-
-                # Interp and extract data
-                P = pd.DataFrame(ds.p.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                T = pd.DataFrame(ds.t.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                e = pd.DataFrame(ds.e.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose())
-                data = pd.concat([dd.reset_index(drop=True), P, T, e], axis=1, ignore_index=True)
+                    x = dd['Lon'].iloc[iter:iter+batchsize]
+                    y = dd['Lat'].iloc[iter:iter+batchsize]
+                    z = xr.DataArray(hgtlvs, dims='z')
+                    # print(x, y)
+                    p = ds.p.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    t = ds.t.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    e = ds.e.interp(x=x, y=y, z=z).values.transpose().diagonal().transpose()
+                    wm_param.append(np.hstack((p,t,e)))
+                wm_param = np.vstack(wm_param)
+                data = pd.concat([dd.reset_index(drop=True), pd.DataFrame(wm_param).reset_index(drop=True)], axis=1, ignore_index=True)
 
                 if num == 0:
                     name = ['P_' + str(i) for i in range(1, len(z) + 1)] + ['T_' + str(i) for i in
@@ -435,16 +448,19 @@ def extract_param_GNSS(df, wm_file_path: str, workLoc: str = '', vertical=False,
                 print('Done', i)
 
             else:
-                # Get coordinate of the GPS station
-                x = xr.DataArray(dd['Lon'].ravel(), dims='x')
-                y = xr.DataArray(dd['Lat'].ravel(), dims='y')
-                z = ds.z.values
-
-                # Interp and extract data
-                P = pd.DataFrame(ds.p.interp(x=x, y=y).values.transpose().diagonal().transpose())
-                T = pd.DataFrame(ds.t.interp(x=x, y=y).values.transpose().diagonal().transpose())
-                e = pd.DataFrame(ds.e.interp(x=x, y=y).values.transpose().diagonal().transpose())
-                data = pd.concat([dd.reset_index(drop=True), P, T, e], axis=1, ignore_index=True)
+                wm_param = []
+                for iter in range(0, len(dd), batchsize):
+                    # Get coordinate of the GPS station
+                    x = dd['Lon'].iloc[iter:iter+batchsize]
+                    y = dd['Lat'].iloc[iter:iter+batchsize]
+                    z = xr.DataArray(hgtlvs, dims='z')
+                    # print(x, y)
+                    p = ds.p.interp(x=x, y=y).values.transpose().diagonal().transpose()
+                    t = ds.t.interp(x=x, y=y).values.transpose().diagonal().transpose()
+                    e = ds.e.interp(x=x, y=y).values.transpose().diagonal().transpose()
+                    wm_param.append(np.hstack((p,t,e)))
+                wm_param = np.vstack(wm_param)
+                data = pd.concat([dd.reset_index(drop=True), pd.DataFrame(wm_param).reset_index(drop=True)], axis=1, ignore_index=True)
 
                 if num == 0:
                     name = ['P_' + str(i) for i in range(1, len(z) + 1)] + ['T_' + str(i) for i in
@@ -456,76 +472,6 @@ def extract_param_GNSS(df, wm_file_path: str, workLoc: str = '', vertical=False,
                 else:
                     data.to_csv(workLoc + 'PTE_vert.csv', mode='a', index=False, header=False)
                 print('Done', i)
-    print('Finished extraction.')
-
-
-def extract_param_GNSS_4Closest(df, wm_file_path: str, workLoc: str = '', k=4, vertical=True, fixed_hgt=False):
-    Date = np.sort(list(set(df['Date'])))
-    for num, i in enumerate(Date):
-        print(i)
-        dd = df.loc[df['Date'] == i]
-        date = i.replace('-', '_')  # Retrieve the date of the GNSS for NWM
-
-        path_name = glob.glob(wm_file_path + 'ERA-5_{date}*[A-Z].nc'.format(date=date))
-        print(path_name)
-        try:
-            ds = xr.load_dataset(" ".join(path_name))  # xr to read the weather model
-            loc = dd[['Lon', 'Lat', 'Hgt_m']].values
-            dist = get_distance(loc[:, 0:-1], ds)
-            index, close4_dist = get_index(dist, (len(ds.x), len(ds.y)), k)
-            row = index[:, 0].astype(int)
-            col = index[:, 1].astype(int)
-        except:
-            print('Can not read weather model')
-            continue
-        if not vertical:  # Might need to cancel this
-            # Create interpreter for each param
-            data = PTE_interp(ds, loc, dd)
-            if num == 0:
-                print('Write file')
-                data.to_csv(workLoc + 'PTE_interp.csv', index=False)
-            else:
-                print('Append to file')
-                data.to_csv(workLoc + 'PTE_interp.csv', mode='a', index=False, header=False)
-            print('Done', i)
-
-        else:
-            if fixed_hgt:
-                z = xr.DataArray(hgtlvs, dims='z')
-
-                P = pd.DataFrame(ds.p.interp(z=z).transpose().values[row, col, :].reshape(len(loc), len(hgtlvs) * k))
-                T = pd.DataFrame(ds.t.interp(z=z).transpose().values[row, col, :].reshape(len(loc), len(hgtlvs) * k))
-                e = pd.DataFrame(ds.e.interp(z=z).transpose().values[row, col, :].reshape(len(loc), len(hgtlvs) * k))
-                data = pd.concat([dd.reset_index(drop=True), P, T, e, pd.DataFrame(close4_dist)], axis=1,
-                                 ignore_index=True)
-                if num == 0:
-                    name = ['P_' + str(i) for i in range(1, len(hgtlvs) * k + 1)] + ['T_' + str(i) for i in
-                                                                                     range(1, len(hgtlvs) * k + 1)] + [
-                               'e_' + str(i) for i in range(1, len(hgtlvs) * k + 1)] + ['dist_' + str(i) for i in
-                                                                                        range(1, k + 1)]
-                    data.columns = np.concatenate((df.columns, name))
-                    data.to_csv(workLoc + 'PTE_closest_4Nodes_vert_fixed_hgtlvs.csv', index=False)
-                else:
-                    data.to_csv(workLoc + 'PTE_closest_4Nodes_vert_fixed_hgtlvs.csv', mode='a', index=False,
-                                header=False)
-                print('Extracted date ', i)
-
-            else:
-                P = pd.DataFrame(ds.p.transpose().values[row, col, :].reshape(len(loc), len(ds.z) * k))
-                T = pd.DataFrame(ds.t.transpose().values[row, col, :].reshape(len(loc), len(ds.z) * k))
-                e = pd.DataFrame(ds.e.transpose().values[row, col, :].reshape(len(loc), len(ds.z) * k))
-                data = pd.concat([dd.reset_index(drop=True), P, T, e, pd.DataFrame(close4_dist)], axis=1,
-                                 ignore_index=True)
-                if num == 0:
-                    name = ['P_' + str(i) for i in range(1, len(ds.z) * k + 1)] + ['T_' + str(i) for i in
-                                                                                   range(1, len(ds.z) * k + 1)] + [
-                               'e_' + str(i) for i in range(1, len(ds.z) * k + 1)] + ['dist_' + str(i) for i in
-                                                                                      range(1, k + 1)]
-                    data.columns = np.concatenate((df.columns, name))
-                    data.to_csv(workLoc + 'PTE_closest_4Nodes_vert.csv', index=False)
-                else:
-                    data.to_csv(workLoc + 'PTE_closest_4Nodes_vert.csv', mode='a', index=False, header=False)
-                print('Extracted date ', i)
     print('Finished extraction.')
 
 

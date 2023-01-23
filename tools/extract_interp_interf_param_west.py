@@ -22,10 +22,10 @@ ifg_path = 'Extracted/unwrappedPhase/'
 wm_path = 'weather_files/'
 dem_path = 'Extracted/DEM/SRTM_3arcsec_uncropped.tif'
 los_path = 'Angle/los.rdr'
-time = 'T23_13_00'
-ref_point = [-78, 40]
-file_name = 'East_downsample'
-left, bottom, right, top = -79, 39, -77, 41
-bands = ('CMI_C07','CMI_C08', 'CMI_C09', 'CMI_C10', 'CMI_C11', 'CMI_C12', 'CMI_C13', 'CMI_C14', 'CMI_C15', 'CMI_C16')
+time = 'T01_50_00'
+ref_point = [-118, 37]
+file_name = 'West_downsample'
+left, bottom, right, top = -119, 36, -117, 38
+bands = ('CMI_C07', 'CMI_C08', 'CMI_C09', 'CMI_C10', 'CMI_C11', 'CMI_C12', 'CMI_C13', 'CMI_C14', 'CMI_C15', 'CMI_C16')
 get_interp_int_params(ifg_path, wm_path, dem_path, los_path,
                       time, ref_point, file_name, left, bottom, right, top, True, 50, bands)

@@ -21,7 +21,7 @@ from extract_func.Extract_PTE_function import *
 # samp: samp default by every 100 item
 # years: years would need to extract in a list e.g. [2019,2020]
 def extract_ifg_param(ifg_path: str, wm_file_path: str, dem_path: str, los_path: str, slope_path: str, coh_path: str,
-                      time: str, lon_min, lat_min, lon_max, lat_max, ref_point=None, name=None, years=None, samp=100,
+                      time: str, lon_min, lat_min, lon_max, lat_max, ref_point, name=None, years=None, samp=100,
                       inter=False):
     file_name = os.getcwd().split('/')[-1]
     if years is None:
@@ -40,6 +40,7 @@ def extract_ifg_param(ifg_path: str, wm_file_path: str, dem_path: str, los_path:
         los, _ = Resamp_rasterio(los_path, lon_min, lat_min, lon_max, lat_max, ifg)
         slope, _ = Resamp_rasterio(slope_path, lon_min, lat_min, lon_max, lat_max, ifg)
         coh, _ = Resamp_rasterio(coh_path + date + '.vrt', lon_min, lat_min, lon_max, lat_max, ifg)
+        row, col = get_rowcol(ifg_, lon_min, lat_min, lon_max, lat_max, ref_point[0], ref_point[1])
 
         # Coherence mask
         coh[coh >= 0.8] = 1.0
@@ -50,11 +51,8 @@ def extract_ifg_param(ifg_path: str, wm_file_path: str, dem_path: str, los_path:
         dem[dem <= 0] = np.nan
         mask[mask > 0] = 1
         mask[mask <= 0] = np.nan
-        if ref_point is None:
-            pass
-        else:
-            row, col = get_rowcol(ifg_, lon_min, lat_min, lon_max, lat_max, ref_point[0], ref_point[1])
-            ifg = ifg - ifg[row, col]
+
+        ifg = ifg - ifg[row, col]
         ifg = ifg * mask
         ifg = ifg * coh
         ifg = convert_rad(ifg, 5.6 / 100)
@@ -70,27 +68,16 @@ def extract_ifg_param(ifg_path: str, wm_file_path: str, dem_path: str, los_path:
         x.sort()
         y = list(set(dem_grid[:, 1]))
         y.sort()
-        if ref_point is None:
-            # Day1 WM (PTe) parameters
-            P1 = P1.interp(x=x, y=y).values
-            T1 = T1.interp(x=x, y=y).values
-            E1 = E1.interp(x=x, y=y).values
 
-            # Day2 WM (PTe) parameters
-            p1 = p1.interp(x=x, y=y).values
-            t1 = t1.interp(x=x, y=y).values
-            e1 = e1.interp(x=x, y=y).values
-        else:
-            # Day1 WM (PTe) parameters dereference
-            P1 = (P1 - P1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y).values
-            T1 = (T1 - T1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y).values
-            E1 = (E1 - E1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y).values
+        # Day1 WM (PTe) parameters
+        P1 = (P1 - P1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y, z=hgtlvs).values
+        T1 = (T1 - T1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y, z=hgtlvs).values
+        E1 = (E1 - E1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y, z=hgtlvs).values
 
-            # Day2 WM (PTe) parameters dereference
-            p1 = (p1 - p1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y).values
-            t1 = (t1 - t1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y).values
-            e1 = (e1 - e1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y).values
-
+        # Day2 WM (PTe) parameters
+        p1 = (p1 - p1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y, z=hgtlvs).values
+        t1 = (t1 - t1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y, z=hgtlvs).values
+        e1 = (e1 - e1.sel(x=ref_point[0], y=ref_point[1], method='nearest')).interp(x=x, y=y, z=hgtlvs).values
         if inter:
             # Get the interferometric P,T,e
             P = (P1 - p1).transpose().reshape((P1.shape[-1] * P1.shape[1], len(hgtlvs)))

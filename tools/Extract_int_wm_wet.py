@@ -10,7 +10,6 @@ from datetime import datetime
 from datetime import timedelta
 from extract_func.Extract_PTE_function import *
 
-
 # add time margin for an input datetime
 def datetime_offset(date_time, time_for='%Y-%m-%dT%H:%M:%S', margin=5):
     time = date_time
@@ -20,7 +19,7 @@ def datetime_offset(date_time, time_for='%Y-%m-%dT%H:%M:%S', margin=5):
     return start_time, end_time
 
 
-def extract_inter_param(df, workLoc='', wm_file_path: str = '', date_diff=12, from_scratch=False,
+def extract_inter_param(df, slope_path: str, workLoc='', wm_file_path: str = '', date_diff=12, from_scratch=False,
                         variables=('P_', 'T_', 'e_')):
     file_name = os.getcwd().split('/')[-1]
     Date = np.sort(list(set(df['Date'])))
@@ -43,7 +42,7 @@ def extract_inter_param(df, workLoc='', wm_file_path: str = '', date_diff=12, fr
             else:
                 pass
             # slope_ex = slope.loc[slope['ID'].isin(df_start.ID)]
-            inter_ZTD = df_start[['ZTD']].values - df_end[['ZTD']].values
+            inter_ZTD = df_end[['ZTD']].values - df_start[['ZTD']].values
             start_date = np.repeat(start, len(inter_ZTD))
             end_date = np.repeat(end, len(inter_ZTD))
             if not from_scratch:
@@ -69,13 +68,12 @@ def extract_inter_param(df, workLoc='', wm_file_path: str = '', date_diff=12, fr
 
                     loc = df_start[['Lon', 'Lat', 'Hgt_m']].values
 
-                    hydro1 = hydro1_interp(loc).reshape(-1, 1)
-                    wet1 = wet1_interp(loc).reshape(-1, 1)
-                    hydro2 = hydro2_interp(loc).reshape(-1, 1)
-                    wet2 = wet2_interp(loc).reshape(-1, 1)
-                    print(hydro1.shape)
+                    hydro1 = hydro1_interp(loc)
+                    wet1 = wet1_interp(loc)
+                    hydro2 = hydro2_interp(loc)
+                    wet2 = wet2_interp(loc)
 
-                    inter_hywt = np.hstack((hydro1, wet1, hydro2, wet2))
+                    inter_hywt = pd.concat([hydro1, wet1, hydro2, wet2], axis=1, ignore_index=True).values
                 else:
                     print('At this moment we are not able to extract GOES data. It is work in progress')
                     break
