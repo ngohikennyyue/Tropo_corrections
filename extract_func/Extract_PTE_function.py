@@ -270,7 +270,7 @@ def Resamp_rasterio(fn: str, left, bottom, right, top, ref):
             src.count,
             int(r_height),
             int(r_width)),
-            resampling=Resampling.nearest, window=window)
+            resampling=Resampling.cubic, window=window)
         X = np.linspace(left, right, r_width)
         Y = np.linspace(top, bottom, r_height)
         X, Y = np.meshgrid(X, Y)
