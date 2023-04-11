@@ -15,3 +15,5 @@ Some useful link to getting GOES data on Google Earth Engine (GEE)
 [End-to-End Google Earth Engine (Full Course Material)](https://courses.spatialthoughts.com/end-to-end-gee.html#)  
 
 
+## Example of change in Total Delay within an hour <br/>
+![](https://github.com/ngohikennyyue/Tropo_corrections/blob/54086e13d6b3f7a8754e09b83c00eef97b74471c/TD_time.gif)
