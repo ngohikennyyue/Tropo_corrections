@@ -252,7 +252,7 @@ def make_interpretor(ds, para=None):
         data = ds.transpose('x', 'y', 'z')
     else:
         data = ds.variables[para].transpose('x', 'y', 'z')
-    interpolator = rgi(points=(x, y, z), values=data.values, method='linear', bounds_error=False)
+    interpolator = rgi(points=(x, y, z), values=data.values, method='cubic', bounds_error=False)
     return interpolator
 
 
