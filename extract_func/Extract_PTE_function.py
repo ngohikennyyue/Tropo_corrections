@@ -1,120 +1,123 @@
-import os
-import math
-import numpy as np
 import datetime
-import matplotlib.pyplot as plt
 import glob
+import math
+import os
+
+import numpy as np
 import pandas as pd
 import rasterio
-from rasterio.windows import from_bounds
-from rasterio.enums import Resampling
-import xarray as xr
-from scipy.interpolate import RegularGridInterpolator as rgi
-from scipy.spatial.distance import pdist
-from scipy.spatial.distance import cdist
 import sklearn
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
-from sklearn.decomposition import PCA
-from sklearn.model_selection import cross_val_score, cross_validate, train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.compose import TransformedTargetRegressor
-from sklearn.model_selection import KFold
 import tensorflow as tf
+import xarray as xr
+from rasterio.enums import Resampling
+from rasterio.windows import from_bounds
+from scipy.spatial.distance import cdist, pdist
+from scipy.interpolate import RegularGridInterpolator as rgi
+from sklearn.compose import TransformedTargetRegressor
+from sklearn.decomposition import PCA
+from sklearn.model_selection import KFold, cross_val_score, cross_validate, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+
 from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
+from tensorflow.keras.layers import BatchNormalization, Dense, Dropout, LeakyReLU, PReLU, ReLU, concatenate
 from tensorflow.keras.losses import Huber
-from tensorflow.keras.layers import Dense, concatenate, Dropout, BatchNormalization
 from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import PReLU, LeakyReLU, ReLU
-from datetime import datetime
-from datetime import timedelta
 
-hgtlvs = [ -100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400
-          ,2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000
-          ,5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000, 11000, 12000, 13000
-          ,14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
 
-# Adding DOY next to the column 'Date'
-# df_path: file path of the data frame that needed to add DOY
-def addDOY(df_path: str):
-    df = pd.read_csv(df_path)
+hgtlvs = [-100, 0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400,
+          2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000,
+          5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000, 11000, 12000, 13000,
+          14000, 15000, 16000, 17000, 18000, 19000, 20000, 25000, 30000, 35000, 40000]
+
+
+def addDOY(file_path: str):
+    df = pd.read_csv(file_path)
     date = df['Date'].values
-    date_date = [datetime.strptime(day, '%Y-%m-%d') for day in date]
+    date_date = [datetime.datetime.strptime(day, '%Y-%m-%d') for day in date]
     DOY = [date.timetuple().tm_yday for date in date_date]
     df.insert(loc=2, column='DOY', value=DOY)
-    df.to_csv(df_path, index=False)
+    df.to_csv(file_path, index=False)
     print('Finished')
 
 
-# Show the metrics
-# true: the actual (Target) compare to the predicting values
-# predict: the ML predicted result
 def print_metric(true, predict, name: str):
     from sklearn.metrics import mean_squared_error, r2_score
-    print('')
-    print(name)
-    # The mean squared error
-    print('Mean squared error: %.10f' % mean_squared_error(true, predict))
-    # The R2 score
-    print('R2: %.5f' % r2_score(true, predict))
-    # The RMSE
+    print(f"\n{name}")
+    print(f"Mean squared error: {mean_squared_error(true, predict):.10f}")
+    print(f"R2: {r2_score(true, predict):.5f}")
     rmse = np.sqrt(mean_squared_error(true, predict))
-    print('RMSE: %.5f' % rmse)
+    print(f"RMSE: {rmse:.5f}")
     errors = predict - true
-    print('Average error: %.5f' % np.mean(abs(errors)))
-    print('')
+    print(f"Average error: {np.mean(abs(errors)):.5f}\n")
 
 
-# Plot the obs v. predict and residual plot
-# true: the actual (Target) compare to the predicting values
-# predict: the ML predicted result
-# model: the name of the model
-# save_loc: the plots will be save at
-def plot_graphs(true, predict, model: str, save_loc: str):
+def plot_graphs(true_data, predicted_data, model_name, save_location):
+    """
+    Plots the observation vs prediction and residual plots and saves them to a file.
+
+    Parameters:
+    true_data (array): The actual (target) values.
+    predicted_data (array): The predicted values.
+    model_name (str): The name of the model.
+    save_location (str): The directory to save the plots in.
+    """
     # Plot of Observation vs Prediction
-    print('Loc: ', save_loc)
-    print('Model: ', model)
+    print('Loc: ', save_location)
+    print('Model: ', model_name)
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
-    density = ax.scatter_density(true, predict, cmap=white_viridis)
+    density = ax.scatter_density(true_data, predicted_data, cmap='viridis')
     cbar = fig.colorbar(density)
     cbar.set_label(label='Number of points per pixel', size=10)
     ax.tick_params(axis='both', which='major', labelsize=10)
     plt.xlabel('Observed', fontsize=10)
     plt.ylabel('Predicted', fontsize=10)
     cbar.ax.tick_params(labelsize=10)
-    fig.suptitle(model + ' obs vs pred')
-    fig.savefig(save_loc + '/' + model + '_Ob_v_Pred.png', dpi=300)
+    fig.suptitle(model_name + ' Observation vs Prediction')
+    fig.savefig(f'{save_location}/{model_name}_Ob_v_Pred.png', dpi=300)
     plt.clf()
 
     # Plot of residual of the prediction
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
-    density = ax.scatter_density(true, true - predict, cmap=white_viridis)
+    density = ax.scatter_density(true_data, true_data - predicted_data, cmap='viridis')
     cbar = fig.colorbar(density)
     cbar.set_label(label='Number of points per pixel', size=10)
     ax.tick_params(axis='both', which='major', labelsize=10)
     plt.xlabel('True', fontsize=10)
     plt.ylabel('Residual', fontsize=10)
     cbar.ax.tick_params(labelsize=10)
-    fig.suptitle(model + ' Residual')
-    fig.savefig(save_loc + '/' + model + '_Resid_true.png', dpi=300)
+    fig.suptitle(model_name + ' Residual')
+    fig.savefig(f'{save_location}/{model_name}_Resid_true.png', dpi=300)
     plt.clf()
 
+def plot_result(true_data, predicted_data):
+    """
+    Plots a histogram of the residuals.
 
-def plot_result(true, predict):
-    plt.hist(true - predict)
+    Parameters:
+    true_data (array): The actual (target) values.
+    predicted_data (array): The predicted values.
+    """
+    plt.hist(true_data - predicted_data)
     plt.xlabel('Residual (m)')
     plt.ylabel('Count')
     plt.show()
 
+def convert_radian_to_distance(data, wavelength):
+    """
+    Converts radians to meters or centimeters.
 
-# Convert radian to cm or m
-def convert_rad(data, lamda):
-    result = (data * lamda) / (4 * np.pi)
+    Parameters:
+    data (array): The data in radians.
+    wavelength (float): The wavelength of the signal.
+
+    Returns:
+    array: The converted data in meters or centimeters.
+    """
+    result = (data * wavelength) / (4 * np.pi)
     return result
-
 
 def standardized(x, scaler):
     if scaler == 'Standard':
@@ -127,9 +130,9 @@ def standardized(x, scaler):
         sc = RobustScaler().fit(x)
         X = sc.transform(x)
     else:
-        return print("Wrong scaler input")
-    return X, sc
+        raise ValueError("Invalid scaler input. Choose from: 'Standard', 'MinMax', 'Robust'")
 
+    return X, sc
 
 import mpl_scatter_density  # adds projection='scatter_density'
 from matplotlib.colors import LinearSegmentedColormap
@@ -152,18 +155,23 @@ def get_datetime(date):
     return date1, date2
 
 
-# Get the closest up and floor hour of the acquisition of InSAR
-# date: date of the weather model needed e.g. 2019_01_12
-# time: time of the InSAR acquire e.g. T11_31_00
-# time_for: the datetime format that is require
-# wmLoc: weather model directory e.g. 'weather_model/weather_files/'
+
 def getWM(date: str, time: str, wmLoc: str = '', time_for='%Y_%m_%d_T%H_%M_%S'):
+    """
+    Get the closest up and floor hour of the acquisition of InSAR
+    date: date of the weather model needed e.g. 2019_01_12
+    time: time of the InSAR acquire e.g. T11_31_00
+    time_for: the datetime format that is require
+    wmLoc: weather model directory e.g. 'weather_model/weather_files/'
+    """
     from datetime import datetime
     from datetime import timedelta
     given_time = datetime.strptime(date + '_' + time, time_for)
     minute = given_time.minute
-    start_time = (given_time.replace(microsecond=0, second=0, minute=0)).strftime(time_for)
-    end_time = (given_time.replace(microsecond=0, second=0, minute=0) + timedelta(hours=1)).strftime(time_for)
+    start_time = (given_time.replace(microsecond=0, second=0,
+                                     minute=0)).strftime(time_for)
+    end_time = (given_time.replace(microsecond=0, second=0, 
+                                   minute=0) + timedelta(hours=1)).strftime(time_for)
     wm1 = xr.load_dataset(" ".join(glob.glob(wmLoc + 'ERA-5_{date}*[A-Z].nc'.format(date=start_time))))
     wm2 = xr.load_dataset(" ".join(glob.glob(wmLoc + 'ERA-5_{date}*[A-Z].nc'.format(date=end_time))))
     return wm1, wm2, minute
@@ -212,8 +220,7 @@ def interpByTime(wm1, wm2, minute, param: str):
         dif = (update_wm1.hydro_total - update_wm2.hydro_total) * (minute / 60)
         return update_wm1.hydro_total - dif
     else:
-        print('No param name: ', param, 'in weather model')
-        pass
+        raise ValueError('Unknown parameter name: {}'.format(param))
 
 def using_mpl_scatter_density(fig, x, y):
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
@@ -221,30 +228,69 @@ def using_mpl_scatter_density(fig, x, y):
     fig.colorbar(density, label='Number of points per pixel')
 
 
-def get_rowcol(Raster, left, bottom, right, top, xs, ys):
-    with rasterio.open(Raster) as src:
-        window = from_bounds(left, bottom, right, top, src.transform)
+def get_rowcol(raster_path, bbox_left, bbox_bottom, bbox_right, bbox_top, xs, ys):
+    """
+    Return the row and column indices corresponding to given coordinates in a raster file.
+
+    Parameters:
+        raster_path (str): path to the raster file
+        bbox_left (float): left (western) bound of the bounding box
+        bbox_bottom (float): bottom (southern) bound of the bounding box
+        bbox_right (float): right (eastern) bound of the bounding box
+        bbox_top (float): top (northern) bound of the bounding box
+        xs (array-like): x-coordinates of points of interest
+        ys (array-like): y-coordinates of points of interest
+
+    Returns:
+        rows (array-like): row indices corresponding to the input coordinates
+        cols (array-like): column indices corresponding to the input coordinates
+    """
+    with rasterio.open(raster_path) as src:
+        window = from_bounds(bbox_left, bbox_bottom, bbox_right, bbox_top, src.transform)
         rows, cols = rasterio.transform.rowcol(src.window_transform(window), xs, ys)
     return rows, cols
 
 
-# Extract value from raster and their lat/lon grid of the bounding area
-def focus_bound(Raster, left, bottom, right, top):
-    from rasterio.windows import Window
-    from rasterio.windows import from_bounds
-    with rasterio.open(Raster) as src:
-        window = from_bounds(left, bottom, right, top, src.transform)
-        w = src.read(1, window=window)
+def focus_bound(raster_path, bbox_left, bbox_bottom, bbox_right, bbox_top):
+    """
+    Extract values and grid coordinates of a raster file within a bounding box.
+
+    Parameters:
+        raster_path (str): path to the raster file
+        bbox_left (float): left (western) bound of the bounding box
+        bbox_bottom (float): bottom (southern) bound of the bounding box
+        bbox_right (float): right (eastern) bound of the bounding box
+        bbox_top (float): top (northern) bound of the bounding box
+
+    Returns:
+        values (ndarray): array of values within the bounding box
+        grid (ndarray): array of grid coordinates within the bounding box, in the order (longitude, latitude)
+    """
+    with rasterio.open(raster_path) as src:
+        window = from_bounds(bbox_left, bbox_bottom, bbox_right, bbox_top, src.transform)
+        values = src.read(1, window=window)
         aff = src.window_transform(window=window)
-        X = [i * aff[0] + aff[2] for i in range(w.shape[1])]
-        Y = [i * aff[4] + aff[5] for i in range(w.shape[0])]
-        X, Y = np.meshgrid(X, Y)
-        grid = np.stack([X.ravel(), Y.ravel()], axis=-1) # [Lon, Lat]
-    return w, grid
+        x = [i * aff[0] + aff[2] for i in range(values.shape[1])]
+        y = [i * aff[4] + aff[5] for i in range(values.shape[0])]
+        x, y = np.meshgrid(x, y)
+        grid = np.stack([x.ravel(), y.ravel()], axis=-1) # [Lon, Lat]
+    return values, grid
+
 
 
 # Function that create an interpretor with an assigned parameter
-def make_interpretor(ds, para=None):
+def make_interpolator(ds, para=None):
+    """
+    Creates an interpolator for the given parameter using cubic interpolation.
+
+    Args:
+        ds (xarray.Dataset): Input dataset.
+        para (str): Name of parameter for which to create the interpolator.
+If None, interpolator is created for all parameters.
+
+    Returns:
+        interpolator
+    """
     x = ds.x.values
     y = ds.y.values
     z = ds.z.values
@@ -263,6 +309,21 @@ from rasterio.enums import Resampling
 
 
 def Resamp_rasterio(fn: str, left, bottom, right, top, ref):
+    '''
+    Resamples the input raster to the specified resolution and returns the resampled data and grid.
+
+    Args:
+        fn (str): Path to the input raster file.
+        left (float): Left boundary of the bounding box.
+        bottom (float): Bottom boundary of the bounding box.
+        right (float): Right boundary of the bounding box.
+        top (float): Top boundary of the bounding box.
+        ref (numpy.ndarray): Reference array to match the resolution to.
+
+    Returns:
+        numpy.ndarray: Resampled data.
+        numpy.ndarray: Grid corresponding to the resampled data.
+    '''
     with rasterio.open(fn) as src:
         r_height, r_width = ref.shape
         window = from_bounds(left, bottom, right, top, src.transform)
@@ -280,6 +341,30 @@ def Resamp_rasterio(fn: str, left, bottom, right, top, ref):
 
 # Function created to extract window data for wet_total and hydro_total
 def extractWindowData_wt_ht(ds1, ds2, dem, los, Raster, left, bottom, right, top):
+    '''
+    Extracts window data for wet_total and hydro_total from input data sources.
+
+    Args:
+        ds1 (xarray.Dataset): First input dataset.
+        ds2 (xarray.Dataset): Second input dataset.
+        dem (str): Path to the digital elevation model (DEM) file.
+        los (str): Path to the line-of-sight (LOS) file.
+        Raster (str): Path to the raster file.
+        left (float): Left boundary of the bounding box.
+        bottom (float): Bottom boundary of the bounding box.
+        right (float): Right boundary of the bounding box.
+        top (float): Top boundary of the bounding box.
+
+    Returns:
+        numpy.ndarray: Wet_total from the first input dataset.
+        numpy.ndarray: Hydro_total from the first input dataset.
+        numpy.ndarray: Wet_total from the second input dataset.
+        numpy.ndarray: Hydro_total from the second input dataset.
+        numpy.ndarray: Resampled DEM.
+        numpy.ndarray: Resampled LOS.
+        numpy.ndarray: Resampled grid.
+        numpy.ndarray: Original data.
+    '''
     w, grid = focus_bound(Raster, left, bottom, right, top)
     dem = Resamp_rasterio(dem, left, right, top, bottom, w).ravel()
     los = Resamp_rasterio(los, left, right, top, bottom, w).ravel()
